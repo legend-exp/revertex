@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import importlib.metadata
 
-import revert as m
+import revertex as m
 
 
 def test_package():
-    assert importlib.metadata.version("revert") == m.__version__
+    assert importlib.metadata.version("revertex") == m.__version__

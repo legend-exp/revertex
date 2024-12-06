@@ -8,7 +8,7 @@ all: apidoc
 apidoc: clean-apidoc
 	sphinx-apidoc --private --module-first --force \
       --output-dir "$(SOURCEDIR)/api" \
-      ../src/revert ../src/revert/_version.py
+      ../src/revertex ../src/revertex/_version.py
 
 clean-apidoc:
 	rm -rf "$(SOURCEDIR)/api"

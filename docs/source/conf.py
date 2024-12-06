@@ -8,9 +8,9 @@ from pkg_resources import get_distribution
 
 sys.path.insert(0, Path(__file__).parents[2].resolve().as_posix())
 
-project = "revert"
+project = "revertex"
 copyright = "The LEGEND Collaboration"
-version = get_distribution("revert").version
+version = get_distribution("revertex").version
 
 extensions = [
     "sphinx.ext.githubpages",
@@ -32,7 +32,7 @@ language = "python"
 # Furo theme
 html_theme = "furo"
 html_theme_options = {
-    "source_repository": "https://github.com/legend-exp/revert",
+    "source_repository": "https://github.com/legend-exp/revertex",
     "source_branch": "main",
     "source_directory": "docs/source",
 }

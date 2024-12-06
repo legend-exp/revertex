@@ -6,7 +6,7 @@ requires = [
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "revert"
+name = "revertex"
 description = "Generate Geant4 event vertices in Python"
 authors = [
     { name = "Luigi Pertoldi", email = "gipert@pm.me" },
@@ -37,17 +37,17 @@ dynamic = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/legend-exp/revert"
-"Bug Tracker" = "https://github.com/legend-exp/revert/issues"
-Discussions = "https://github.com/legend-exp/revert/discussions"
-Changelog = "https://github.com/legend-exp/revert/releases"
+Homepage = "https://github.com/legend-exp/revertex"
+"Bug Tracker" = "https://github.com/legend-exp/revertex/issues"
+Discussions = "https://github.com/legend-exp/revertex/discussions"
+Changelog = "https://github.com/legend-exp/revertex/releases"
 
 [tool.setuptools_scm]
-write_to = "src/revert/_version.py"
+write_to = "src/revertex/_version.py"
 
 [project.optional-dependencies]
 all = [
-    "revert[docs,test]",
+    "revertex[docs,test]",
 ]
 docs = [
     "furo",
