@@ -34,7 +34,11 @@ dependencies = [
     "hist",
     "scipy",
     "numpy",
-    "legend-pygeom-hpges"
+    "awkward",
+    "legend-pydataobj>=1.11.6",
+    "legend-pygeom-hpges",
+    "dbetto",
+    "matplotlib",
 ]
 dynamic = [
     "version",

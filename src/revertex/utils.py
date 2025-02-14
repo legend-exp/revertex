@@ -3,7 +3,6 @@ from __future__ import annotations
 import logging
 
 import numpy as np
-from lgdo import Table
 
 log = logging.getLogger(__name__)
 
@@ -25,8 +24,3 @@ def read_input_beta_csv(path: str, **kwargs) -> tuple[np.ndarray, np.ndarray]:
         keyword arguments to pass to `np.genfromtxt`
     """
     return np.genfromtxt(path, **kwargs).T[0], np.genfromtxt(path, **kwargs).T[1]
-
-
-def check_output(tab: Table):
-    """Checks that the output file can be read by remage"""
-    raise NotImplementedError
