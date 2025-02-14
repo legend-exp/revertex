@@ -1,5 +1,14 @@
 from __future__ import annotations
 
+import logging
+
+import legendhpges
+import numpy as np
+from numpy.typing import NDArray
+from scipy.stats import rv_continuous
+
+log = logging.getLogger(__name__)
+
 
 def generate_many_hpge_surface(
     n_tot: int,
@@ -25,7 +34,11 @@ def generate_many_hpge_surface(
     (local_coords,det_ids)
         tuple of an NDArray of local coordinates and another of detector_ids (index of the hpges list).
     """
-    rng = np.random.default_rng(seed=seed) if seed is not None else np.random.default_rng()
+    rng = (
+        np.random.default_rng(seed=seed)
+        if seed is not None
+        else np.random.default_rng()
+    )
 
     out = np.full((n_tot, 3), np.nan)
 
@@ -39,7 +52,8 @@ def generate_many_hpge_surface(
 
     # total surface area per detector
     surf_tot = [
-        np.sum(hpge.surface_area(surf_ids).magnitude) for hpge, surf_ids in zip(hpges, surf_ids_tot)
+        np.sum(hpge.surface_area(surf_ids).magnitude)
+        for hpge, surf_ids in zip(hpges, surf_ids_tot)
     ]
 
     p_det = surf_tot / np.sum(surf_tot)
@@ -49,7 +63,9 @@ def generate_many_hpge_surface(
     # loop over n_det maybe could be faster
     for idx, hpge in enumerate(hpges):
         n = np.sum(det_index == idx)
-        out[det_index == idx] = generate_hpge_surface(n, hpge, surface_type=surface_type, seed=seed)
+        out[det_index == idx] = generate_hpge_surface(
+            n, hpge, surface_type=surface_type, seed=seed
+        )
 
     return out, det_index
 
@@ -80,7 +96,11 @@ def generate_hpge_surface(
     -------
     NDArray with shape `(n,3)` describing the local `(x,y,z)` positions for every vertex
     """
-    rng = np.random.default_rng(seed=seed) if seed is not None else np.random.default_rng()
+    rng = (
+        np.random.default_rng(seed=seed)
+        if seed is not None
+        else np.random.default_rng()
+    )
 
     # get the indices (r,z) pairs
 

@@ -1,12 +1,24 @@
 from __future__ import annotations
 
+import logging
+
+import awkward as ak
+from numpy.typing import ArrayLike
+
+log = logging.getLogger(__name__)
 
 
-def generate_beta_spectrum(energies:ArrayLike,phase_space:ArrayLike, *,seed:int | None = None,mode:str = "left")->ak.Array:
+def generate_beta_spectrum(
+    energies: ArrayLike,
+    phase_space: ArrayLike,
+    *,
+    seed: int | None = None,
+    mode: str = "left",
+) -> ak.Array:
     """Generate samples from a beta spectrum defined by a list of energies and phase space
     values.
-    
-    This function interprets the energies and phase_space as a histogram and samples 
+
+    This function interprets the energies and phase_space as a histogram and samples
     energies from this. These are then converted into momenta.
 
     Parameters
@@ -24,5 +36,3 @@ def generate_beta_spectrum(energies:ArrayLike,phase_space:ArrayLike, *,seed:int 
     -------
     An awkward array with the sampled kinematics.
     """
-
-    pass

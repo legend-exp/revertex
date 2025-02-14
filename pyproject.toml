@@ -31,6 +31,10 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies = [
     "pyg4ometry",
+    "hist",
+    "scipy",
+    "numpy",
+    "legend-pygeom-hpges"
 ]
 dynamic = [
     "version",
