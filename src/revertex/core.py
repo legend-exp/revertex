@@ -108,11 +108,6 @@ def convert_output(
     -------
     The output table.
     """
-
-    if mode != "pos" and mode != "kin":
-        msg = f"Only modes pos or kin are supported for converting outputs not {mode}"
-        raise ValueError(msg)
-
     out = Table(size=len(arr))
 
     if mode == "pos":

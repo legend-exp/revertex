@@ -36,3 +36,5 @@ def generate_beta_spectrum(
     -------
     An awkward array with the sampled kinematics.
     """
+
+    # build the histogram
