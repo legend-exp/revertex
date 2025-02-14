@@ -87,7 +87,6 @@ def test_hist_sample_two_dim():
     expected_fraction /= n_tot
     fraction /= n_tot
 
-    print(fraction, expected_fraction)
     test_stat = 2 * np.sum(
         n_tot * expected_fraction
         - (fraction * n_tot) * (1 - np.log(fraction / expected_fraction))
