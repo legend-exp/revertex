@@ -112,13 +112,13 @@ def convert_output(
 
     if mode == "pos":
         for field in ["xloc", "yloc", "zloc"]:
-            out.add_field(field, Array(arr[field], attrs={"units": lunit}))
+            out.add_field(field, Array(arr[field].to_numpy(), attrs={"units": lunit}))
 
     elif mode == "kin":
         for field in ["px", "py", "pz", "ekin"]:
-            out.add_field(field, Array(arr[field], attrs={"units": eunit}))
+            out.add_field(field, Array(arr[field].to_numpy(), attrs={"units": eunit}))
 
-        out.add_field("particle", Array(arr["particle"]))
+        out.add_field("particle", Array(arr["particle"].to_numpy()))
     else:
         msg = f"Only modes pos or kin are supported for converting outputs not {mode}"
         raise ValueError(msg)
