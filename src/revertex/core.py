@@ -5,7 +5,7 @@ import logging
 import awkward as ak
 import hist
 import numpy as np
-from lgdo.types import Table
+from lgdo.types import Array, Table
 
 log = logging.getLogger(__name__)
 
@@ -86,5 +86,46 @@ def sample_histogram(
     raise ValueError(msg)
 
 
-def convert_output(arr: ak.Array, *, mode: str = "pos") -> Table:
-    """Converts the vertices to the correct output format."""
+def convert_output(
+    arr: ak.Array, *, mode: str = "pos", lunit: str = "mm", eunit: str = "keV"
+) -> Table:
+    """Converts the vertices to the correct output format.
+
+    This function creates a table of either `kin` or `pos` information.
+
+    Parameters
+    ----------
+    arr
+        The input data to convert
+    mode
+        The mode either 'pos' or 'kin'
+    lunit
+        Unit for distances, by default mm.
+    eunit
+        Unit for energy, by default keV.
+
+    Returns
+    -------
+    The output table.
+    """
+
+    if mode != "pos" and mode != "kin":
+        msg = f"Only modes pos or kin are supported for converting outputs not {mode}"
+        raise ValueError(msg)
+
+    out = Table(size=len(arr))
+
+    if mode == "pos":
+        for field in ["xloc", "yloc", "zloc"]:
+            out.add_field(field, Array(arr[field], attrs={"units": lunit}))
+
+    elif mode == "kin":
+        for field in ["px", "py", "pz", "ekin"]:
+            out.add_field(field, Array(arr[field], attrs={"units": eunit}))
+
+        out.add_field("particle", Array(arr["particle"]))
+    else:
+        msg = f"Only modes pos or kin are supported for converting outputs not {mode}"
+        raise ValueError(msg)
+
+    return out
