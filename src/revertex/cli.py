@@ -5,6 +5,8 @@ import logging
 
 from reboost.log_utils import setup_log
 
+from revertex.generators import beta
+
 log = logging.getLogger(__name__)
 
 
@@ -22,7 +24,13 @@ def cli(args=None) -> None:
         default=1,
         help="""Increase the program verbosity""",
     )
-
+    parser.add_argument(
+        "--seed",
+        "-s",
+        default=None,
+        type=int,
+        help="Seed for rng",
+    )
     subparsers = parser.add_subparsers(dest="command", required=True)
 
     # beta spectra
@@ -32,7 +40,7 @@ def cli(args=None) -> None:
 
     beta_parser.add_argument(
         "--input-file",
-        "-f",
+        "-i",
         required=True,
         type=str,
         help="Path to the file with the spectrum to sample",
@@ -50,6 +58,13 @@ def cli(args=None) -> None:
         required=True,
         type=int,
         help="Number of events to generate",
+    )
+    beta_parser.add_argument(
+        "--eunit",
+        "-e",
+        required=True,
+        type=str,
+        help="Unit for the energy",
     )
 
     hpge_surface_parser = subparsers.add_parser(
@@ -96,3 +111,15 @@ def cli(args=None) -> None:
 
     log_level = (None, logging.INFO, logging.DEBUG)[min(args.verbose, 2)]
     setup_log(log_level)
+
+    if args.command == "beta-kin":
+        msg = f"Generating beta kinematics from {args.input_file} to {args.out_file} and seed {args.seed}"
+        log.info(msg)
+
+        beta.save_beta_spectrum(
+            n_gen=args.n_events,
+            out_file=args.out_file,
+            in_file=args.input_file,
+            seed=args.seed,
+            eunit=args.eunit,
+        )

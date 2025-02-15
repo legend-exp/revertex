@@ -10,6 +10,14 @@ from lgdo.types import Array, Table
 log = logging.getLogger(__name__)
 
 
+def _get_chunks(n: int, m: int) -> np.ndarray:
+    return (
+        np.full(n // m, m, dtype=int)
+        if n % m == 0
+        else np.append(np.full(n // m, m, dtype=int), n % m)
+    )
+
+
 def sample_histogram(
     histo: hist.Hist, size: int, *, seed: int | None = None
 ) -> np.ndarray:
@@ -118,7 +126,7 @@ def convert_output(
         for field in ["px", "py", "pz", "ekin"]:
             out.add_field(field, Array(arr[field].to_numpy(), attrs={"units": eunit}))
 
-        out.add_field("particle", Array(arr["particle"].to_numpy()))
+        out.add_field("g4_pid", Array(arr["g4_pid"].to_numpy()))
     else:
         msg = f"Only modes pos or kin are supported for converting outputs not {mode}"
         raise ValueError(msg)
