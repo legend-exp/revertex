@@ -37,6 +37,7 @@ dependencies = [
     "awkward",
     "legend-pydataobj>=1.11.6",
     "legend-pygeom-hpges",
+    "legend-pygeom-tools",
     "reboost",
     "dbetto",
     "matplotlib",
