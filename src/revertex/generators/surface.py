@@ -56,19 +56,22 @@ def save_surface_points(
         )
         for name in det_list
     }
+
     pos = {name: phy_vol_dict[name].position.eval() for name in det_list}
 
-    msg = f"Generating surface events for {hpges.keys()}"
+    msg = f"Generating surface events for {hpges.keys()} "
     log.info(msg)
 
     chunks = core._get_chunks(size, 1000_000)
 
     for idx, chunk in enumerate(chunks):
-        pos = generate_many_hpge_surface(
+        positions = generate_many_hpge_surface(
             chunk, hpges=hpges, positions=pos, surface_type=surface_type, seed=seed
         )
 
-        pos_ak = ak.Array({"xloc": pos[0, :], "yloc": pos[1, :], "zloc": pos[2, :]})
+        pos_ak = ak.Array(
+            {"xloc": positions[0, :], "yloc": positions[1, :], "zloc": positions[2, :]}
+        )
 
         msg = f"Generated hpge surface positions {pos_ak}"
         log.debug(msg)
@@ -77,7 +80,10 @@ def save_surface_points(
         seed = seed * 7 if seed is not None else None
 
         # convert
-        pos_lh5 = core.convert_output(pos_ak, mode="pos", eunit=lunit)
+        pos_lh5 = core.convert_output(pos_ak, mode="pos", lunit=lunit)
+
+        msg = f"Output {pos_lh5}"
+        log.debug(msg)
 
         # write
         mode = "of" if idx == 0 else "append"
