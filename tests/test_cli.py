@@ -27,3 +27,22 @@ def test_cli(tmptestdir):
 
     kin = lh5.read("vtx/kin", f"{tmptestdir}/test_beta.lh5").view_as("ak")
     assert kin.fields == ["px", "py", "pz", "ekin", "g4_pid"]
+
+    cli(
+        [
+            "hpge-surf-pos",
+            "-g",
+            f"{test_file_dir}/test_files/geom.gdml",
+            "-t",
+            "nplus",
+            "-d",
+            "B*",
+            "-o",
+            f"{tmptestdir}/test_surf.lh5",
+            "-n",
+            "100",
+        ]
+    )
+
+    pos = lh5.read("vtx/pos", f"{tmptestdir}/test_surf.lh5").view_as("ak")
+    assert pos.fields == ["xloc", "yloc", "zloc"]
