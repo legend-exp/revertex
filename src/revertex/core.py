@@ -124,10 +124,12 @@ def convert_output(
 
     elif mode == "kin":
         for field in ["px", "py", "pz", "ekin"]:
-            unit = eunit if field == "ekin" else f""
+            unit = eunit if field == "ekin" else ""
             out.add_field(field, Array(arr[field].to_numpy(), attrs={"units": unit}))
 
-        out.add_field("g4_pid", Array(arr["g4_pid"].to_numpy().astype(np.int64),dtype=np.int64))
+        out.add_field(
+            "g4_pid", Array(arr["g4_pid"].to_numpy().astype(np.int64), dtype=np.int64)
+        )
     else:
         msg = f"Only modes pos or kin are supported for converting outputs not {mode}"
         raise ValueError(msg)
