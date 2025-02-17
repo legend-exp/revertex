@@ -3,9 +3,10 @@ from __future__ import annotations
 import argparse
 import logging
 
-from reboost.log_utils import setup_log
+import pyg4ometry
 
-from revertex.generators import beta
+from revertex.generators import beta, surface
+from revertex.utils import setup_log
 
 log = logging.getLogger(__name__)
 
@@ -86,9 +87,10 @@ def cli(args=None) -> None:
         help="Type of surface",
     )
     hpge_surface_parser.add_argument(
-        "--detector",
+        "--detectors",
         "-d",
         required=True,
+        nargs="+",
         type=str,
         help="Name of a detector, list of detectors or regex's.",
     )
@@ -122,4 +124,24 @@ def cli(args=None) -> None:
             in_file=args.input_file,
             seed=args.seed,
             eunit=args.eunit,
+        )
+
+    elif args.command == "hpge-surf-pos":
+        msg = "Generating points on the HPGes for \n"
+        msg += f"gdml:      {args.gdml} \n"
+        msg += f"output:    {args.out_file} \n"
+        msg += f"seed:      {args.seed} \n"
+        msg += f"detectors: {args.detectors} ({args.surface_type})"
+        log.info(msg)
+
+        # read the registry
+        reg = pyg4ometry.gdml.Reader(args.gdml).getRegistry()
+
+        surface.save_surface_points(
+            size=args.n_events,
+            reg=reg,
+            out_file=args.out_file,
+            detectors=args.detectors,
+            surface_type=args.surface_type,
+            seed=args.seed,
         )

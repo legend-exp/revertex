@@ -45,7 +45,10 @@ def test_many_surface_gen(test_data_configs):
     hpge_BG = legendhpges.make_hpge(test_data_configs + "/B99000A.json", registry=reg)
     hpge_SC = legendhpges.make_hpge(test_data_configs + "/C99000A.json", registry=reg)
 
-    coords, ids = generate_many_hpge_surface(1000, [hpge_IC, hpge_BG, hpge_SC])
+    coords = generate_many_hpge_surface(
+        1000,
+        hpges={"V99000A": hpge_IC, "B99000A": hpge_BG, "C99000A": hpge_SC},
+        positions={"V99000A": [0, 0, 0], "B99000A": [0, 0, 0], "C99000A": [0, 0, 0]},
+    )
 
     assert np.shape(coords) == (1000, 3)
-    assert np.shape(ids) == (1000,)

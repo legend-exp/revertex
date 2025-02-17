@@ -2,20 +2,95 @@ from __future__ import annotations
 
 import logging
 
+import awkward as ak
 import legendhpges
 import numpy as np
-from numpy.typing import NDArray
+import pyg4ometry as pg4
+import pygeomtools
+from lgdo import lh5
+from numpy.typing import ArrayLike, NDArray
 from scipy.stats import rv_continuous
+
+from revertex import core, utils
 
 log = logging.getLogger(__name__)
 
 
+def save_surface_points(
+    size: int,
+    reg: pg4.geant4.registry,
+    out_file: str,
+    detectors: str | list[str],
+    *,
+    surface_type: str | None = None,
+    lunit: str = "mm",
+    seed: int | None = None,
+):
+    """Generate points on the HPGe surface and save to a file.
+
+    Parameters
+    ----------
+    size
+        The number of vertices to generate
+    reg
+        The registry of the geometry,
+    out_file
+        path to the output file.
+    detectors
+        list of detector physical volume names, or a single name, or regex's.
+    surface_type
+        type of surface to generate points on, either `nplus`, `pplus` `passive` or None (all surfaces).
+    lunit
+        Unit for the lengths.
+    seed
+        seed for random number generation.
+
+    """
+    # print the registry
+    phy_vol_dict = reg.physicalVolumeDict
+    det_list = utils.expand_regex(list(phy_vol_dict.keys()), list(detectors))
+
+    hpges = {
+        name: legendhpges.make_hpge(
+            pygeomtools.get_sensvol_metadata(reg, name), registry=None
+        )
+        for name in det_list
+    }
+    pos = {name: phy_vol_dict[name].position.eval() for name in det_list}
+
+    msg = f"Generating surface events for {hpges.keys()}"
+    log.info(msg)
+
+    chunks = core._get_chunks(size, 1000_000)
+
+    for idx, chunk in enumerate(chunks):
+        pos = generate_many_hpge_surface(
+            chunk, hpges=hpges, positions=pos, surface_type=surface_type, seed=seed
+        )
+
+        pos_ak = ak.Array({"xloc": pos[0, :], "yloc": pos[1, :], "zloc": pos[2, :]})
+
+        msg = f"Generated hpge surface positions {pos_ak}"
+        log.debug(msg)
+
+        # update the seed
+        seed = seed * 7 if seed is not None else None
+
+        # convert
+        pos_lh5 = core.convert_output(pos_ak, mode="pos", eunit=lunit)
+
+        # write
+        mode = "of" if idx == 0 else "append"
+        lh5.write(pos_lh5, "vtx/pos", out_file, wo_mode=mode)
+
+
 def generate_many_hpge_surface(
     n_tot: int,
-    hpges: list[legendhpges.HPGe],
+    hpges: dict[str, legendhpges.HPGe],
+    positions: dict[str, ArrayLike],
     surface_type: str | None = None,
     seed: int | None = None,
-) -> tuple[NDArray, NDArray]:
+) -> NDArray:
     """Generate events on many HPGe's weighting by the surface area.
 
     Parameters
@@ -24,6 +99,8 @@ def generate_many_hpge_surface(
         total number of events to generate
     hpges
         List of :class:`legendhpges.HPGe` objects.
+    positions
+        List of the origin position of each HPGe.
     surface_type
         Which surface to generate events on either `nplus`, `pplus`, `passive` or None (generate on all surfaces).
     seed
@@ -31,14 +108,9 @@ def generate_many_hpge_surface(
 
     Returns
     -------
-    (local_coords,det_ids)
-        tuple of an NDArray of local coordinates and another of detector_ids (index of the hpges list).
+    NDArray of global coordinates.
     """
-    rng = (
-        np.random.default_rng(seed=seed)
-        if seed is not None
-        else np.random.default_rng()
-    )
+    rng = np.random.default_rng(seed=seed)
 
     out = np.full((n_tot, 3), np.nan)
 
@@ -47,13 +119,13 @@ def generate_many_hpge_surface(
         np.array(hpge.surfaces) == surface_type
         if surface_type is not None
         else np.arange(len(hpge.surfaces))
-        for hpge in hpges
+        for name, hpge in hpges.items()
     ]
 
     # total surface area per detector
     surf_tot = [
         np.sum(hpge.surface_area(surf_ids).magnitude)
-        for hpge, surf_ids in zip(hpges, surf_ids_tot)
+        for (name, hpge), surf_ids in zip(hpges.items(), surf_ids_tot)
     ]
 
     p_det = surf_tot / np.sum(surf_tot)
@@ -61,13 +133,15 @@ def generate_many_hpge_surface(
     det_index = rng.choice(np.arange(len(hpges)), size=n_tot, p=p_det)
 
     # loop over n_det maybe could be faster
-    for idx, hpge in enumerate(hpges):
+    for idx, (name, hpge) in enumerate(hpges.items()):
         n = np.sum(det_index == idx)
-        out[det_index == idx] = generate_hpge_surface(
-            n, hpge, surface_type=surface_type, seed=seed
+
+        out[det_index == idx] = (
+            generate_hpge_surface(n, hpge, surface_type=surface_type, seed=seed)
+            + positions[name]
         )
 
-    return out, det_index
+    return out
 
 
 def generate_hpge_surface(
