@@ -70,7 +70,7 @@ def save_surface_points(
         )
 
         pos_ak = ak.Array(
-            {"xloc": positions[0, :], "yloc": positions[1, :], "zloc": positions[2, :]}
+            {"xloc": positions[:, 0], "yloc": positions[:, 1], "zloc": positions[:, 2]}
         )
 
         msg = f"Generated hpge surface positions {pos_ak}"
