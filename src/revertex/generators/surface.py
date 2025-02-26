@@ -201,7 +201,10 @@ def generate_hpge_surface(
     s1, s2 = legendhpges.utils.get_line_segments(r, z)
 
     # compute random coordinates
-    frac = rng.uniform(low=0, high=1, size=(len(sides)))
+    r1 = s1[sides][:, 0]
+    r2 = s2[sides][:, 0]
+
+    frac = core.sample_proportional_radius(r1, r2, size=(len(sides)))
 
     rz_coords = s1[sides] + (s2[sides] - s1[sides]) * frac[:, np.newaxis]
 

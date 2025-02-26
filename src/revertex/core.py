@@ -6,6 +6,7 @@ import awkward as ak
 import hist
 import numpy as np
 from lgdo.types import Array, Table
+from numpy.typing import ArrayLike
 
 log = logging.getLogger(__name__)
 
@@ -135,3 +136,63 @@ def convert_output(
         raise ValueError(msg)
 
     return out
+
+
+def sample_proportional_radius(
+    r0: ArrayLike, r1: ArrayLike, size: int = 10000, seed: int | None = None
+):
+    r"""Sample from a distribution weighted by the radius. This is used for the surface sampling og shapes.
+
+    Based on sampling from a distribution:
+
+    .. math::
+
+        P(r) \propto r
+
+    restricted to the range min(r0,r1) to max(r0,r1).
+
+
+    Parameters
+    ----------
+    r0
+        list of first radius, must have the same length as size.
+    r1
+        list of second, must have the same length as size.
+    size
+        number of samples.
+    seed
+        random seed for rng.
+    """
+    rng = (
+        np.random.default_rng(seed=seed)
+        if seed is not None
+        else np.random.default_rng()
+    )
+    if len(r0) != size or len(r1) != size:
+        msg = (
+            f"r0 and r1 must have {size} elements not {len(r0)} (r0) or {len(r1)} (r1)"
+        )
+        raise ValueError(msg)
+
+    # Ensure r0 and r1 are numpy arrays
+    r0, r1 = np.asarray(r0), np.asarray(r1)
+
+    # Get min and max for each pair
+    sign = r1 > r0
+    a = np.minimum(r0, r1)
+    b = np.maximum(r0, r1)
+
+    # Generate uniform samples for each pair
+    u = rng.uniform(size=a.shape)  # Same shape as r0 and r1
+
+    # Apply inverse transform sampling element-wise
+    result = u
+    mask = a != b
+
+    result[mask] = (
+        np.sqrt(u[mask] * (b[mask] ** 2 - a[mask] ** 2) + a[mask] ** 2) - a[mask]
+    ) / (b[mask] - a[mask])
+
+    result[~sign] = 1 - result[~sign]
+
+    return result

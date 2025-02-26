@@ -115,3 +115,10 @@ def test_convert():
 
     for f in arr.fields:
         assert ak.all(core.convert_output(arr, mode="kin").view_as("ak")[f] == arr[f])
+
+
+def test_sample_proportional_radius():
+    samples = core.sample_proportional_radius(
+        np.zeros(10000), np.ones(10000), size=10000
+    )
+    assert len(samples) == 10000
