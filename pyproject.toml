@@ -31,6 +31,16 @@ classifiers = [
 requires-python = ">=3.9"
 dependencies = [
     "pyg4ometry",
+    "hist",
+    "scipy",
+    "numpy",
+    "awkward",
+    "legend-pydataobj>=1.11.6",
+    "legend-pygeom-hpges",
+    "legend-pygeom-tools",
+    "reboost",
+    "dbetto",
+    "matplotlib",
 ]
 dynamic = [
     "version",
@@ -61,6 +71,9 @@ test = [
     "pytest>=6.0",
     "pytest-cov",
 ]
+
+[project.scripts]
+revertex         = "revertex.cli:cli"
 
 [tool.setuptools]
 include-package-data = true
