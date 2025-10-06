@@ -75,7 +75,7 @@ def sample_histogram(
         probs = probs / np.sum(probs)
         bin_idx = rng.choice(np.arange(np.size(probs)), size=size, p=probs.flatten())
 
-        rows, cols = probs.shape
+        _rows, cols = probs.shape
 
         # extract unflattened indices
         row = bin_idx // cols
