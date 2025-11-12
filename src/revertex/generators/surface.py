@@ -85,7 +85,7 @@ def generate_hpge_surface(
 
     Returns
     -------
-    NDArray with shape `(n,3)` describing the local `(x,y,z)` positions for every vertex
+    Array with shape `(n,3)` describing the local `(x,y,z)` positions for every vertex
     """
     rng = (
         np.random.default_rng(seed=seed)

@@ -4,6 +4,7 @@ import legendhpges
 import numpy as np
 import pytest
 from legendtestdata import LegendTestData
+from pyg4ometry import geant4
 
 from revertex.generators.shell import generate_hpge_shell, generate_hpge_shell_points
 

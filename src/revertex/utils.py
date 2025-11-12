@@ -9,6 +9,8 @@ import numpy as np
 import pyg4ometry.geant4 as pg4
 import pygeomtools
 
+from revertex import core
+
 log = logging.getLogger(__name__)
 
 
@@ -101,6 +103,31 @@ def get_surface_weights(hpges: dict, surface_type: str | None) -> list:
     ]
 
     return surf_tot / np.sum(surf_tot)
+
+
+def get_borehole_volume(hpge: legendhpges.HPGe, size=1000000):
+    """Estimate the borehole volume (with MC)"""
+
+    r, z = hpge.get_profile()
+    height = max(z)
+    radius = max(r)
+
+    points = core.sample_cylinder(
+        r_range=(0, radius), z_range=(0, height), seed=None, size=size
+    )
+    vol = np.pi * radius**2 * height
+
+    is_good = len(points[hpge.is_inside_borehole(points)])
+
+    return (is_good / size) * vol
+
+
+def get_borehole_weights(hpges: dict) -> list:
+    """Get a weighting for each hpge in the `hpges` based on borehole volume"""
+
+    vol_tot = [get_borehole_volume(hpge, size=int(1e6)) for _, hpge in hpges.items()]
+
+    return vol_tot / np.sum(vol_tot)
 
 
 def setup_log(level: int | None = None) -> None:
