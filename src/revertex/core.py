@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+from typing import Callable
 
 import awkward as ak
 import hist
 import numpy as np
+from lgdo import lh5
 from lgdo.types import Array, Table
 from numpy.typing import ArrayLike
 
@@ -136,6 +138,57 @@ def convert_output(
         raise ValueError(msg)
 
     return out
+
+
+def save_vertices(
+    n: int,
+    out_file: str,
+    seed: int | None,
+    generator: Callable,
+    lunit: str = "mm",
+    **kwargs,
+) -> None:
+    """Save the vertices generatored by a particular vertex generator function
+
+    Parameters
+    ----------
+    n
+        The number of vertices to generate
+    out_file
+        The path to the file to save the results.
+    seed
+        The seed to the random number generator
+    generator
+        A function generating the vertices (following the revertex specifications)
+    kwargs
+        The keyword arguments to the function
+
+    """
+
+    chunks = _get_chunks(n, 1000_000)
+
+    for idx, chunk in enumerate(chunks):
+        positions = generator(chunk, **kwargs)
+
+        pos_ak = ak.Array(
+            {"xloc": positions[:, 0], "yloc": positions[:, 1], "zloc": positions[:, 2]}
+        )
+
+        msg = f"Generated vertices {pos_ak}"
+        log.debug(msg)
+
+        # update the seed
+        seed = seed * 7 if seed is not None else None
+
+        # convert
+        pos_lh5 = convert_output(pos_ak, mode="pos", lunit=lunit)
+
+        msg = f"Output {pos_lh5}"
+        log.debug(msg)
+
+        # write
+        mode = "of" if idx == 0 else "append"
+        lh5.write(pos_lh5, "vtx/pos", out_file, wo_mode=mode)
 
 
 def sample_proportional_radius(

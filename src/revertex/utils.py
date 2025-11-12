@@ -4,7 +4,10 @@ import logging
 import re
 
 import colorlog
+import legendhpges
 import numpy as np
+import pyg4ometry.geant4 as pg4
+import pygeomtools
 
 log = logging.getLogger(__name__)
 
@@ -47,6 +50,24 @@ def read_input_beta_csv(path: str, **kwargs) -> tuple[np.ndarray, np.ndarray]:
         keyword arguments to pass to `np.genfromtxt`
     """
     return np.genfromtxt(path, **kwargs).T[0], np.genfromtxt(path, **kwargs).T[1]
+
+
+def get_hpges(reg: pg4.geant4.registry, detectors: str | list[str]):
+    """Extract the objects for each HPGe detector in `ref` and in the list of `detectors`"""
+
+    phy_vol_dict = reg.physicalVolumeDict
+    det_list = expand_regex(list(phy_vol_dict.keys()), list(detectors))
+
+    hpges = {
+        name: legendhpges.make_hpge(
+            pygeomtools.get_sensvol_metadata(reg, name), registry=None
+        )
+        for name in det_list
+    }
+
+    pos = {name: phy_vol_dict[name].position.eval() for name in det_list}
+
+    return hpges, pos
 
 
 def setup_log(level: int | None = None) -> None:

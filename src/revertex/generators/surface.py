@@ -2,100 +2,23 @@ from __future__ import annotations
 
 import logging
 
-import awkward as ak
 import legendhpges
 import numpy as np
-import pyg4ometry as pg4
-import pygeomtools
-from lgdo import lh5
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import rv_continuous
 
-from revertex import core, utils
+from revertex import core
 
 log = logging.getLogger(__name__)
 
 
-def save_surface_points(
-    size: int,
-    reg: pg4.geant4.registry,
-    out_file: str,
-    detectors: str | list[str],
-    *,
-    surface_type: str | None = None,
-    lunit: str = "mm",
-    seed: int | None = None,
-):
-    """Generate points on the HPGe surface and save to a file.
-
-    Parameters
-    ----------
-    size
-        The number of vertices to generate
-    reg
-        The registry of the geometry,
-    out_file
-        path to the output file.
-    detectors
-        list of detector physical volume names, or a single name, or regex's.
-    surface_type
-        type of surface to generate points on, either `nplus`, `pplus` `passive` or None (all surfaces).
-    lunit
-        Unit for the lengths.
-    seed
-        seed for random number generation.
-
-    """
-    # print the registry
-    phy_vol_dict = reg.physicalVolumeDict
-    det_list = utils.expand_regex(list(phy_vol_dict.keys()), list(detectors))
-
-    hpges = {
-        name: legendhpges.make_hpge(
-            pygeomtools.get_sensvol_metadata(reg, name), registry=None
-        )
-        for name in det_list
-    }
-
-    pos = {name: phy_vol_dict[name].position.eval() for name in det_list}
-
-    msg = f"Generating surface events for {hpges.keys()} "
-    log.info(msg)
-
-    chunks = core._get_chunks(size, 1000_000)
-
-    for idx, chunk in enumerate(chunks):
-        positions = generate_many_hpge_surface(
-            chunk, hpges=hpges, positions=pos, surface_type=surface_type, seed=seed
-        )
-
-        pos_ak = ak.Array(
-            {"xloc": positions[:, 0], "yloc": positions[:, 1], "zloc": positions[:, 2]}
-        )
-
-        msg = f"Generated hpge surface positions {pos_ak}"
-        log.debug(msg)
-
-        # update the seed
-        seed = seed * 7 if seed is not None else None
-
-        # convert
-        pos_lh5 = core.convert_output(pos_ak, mode="pos", lunit=lunit)
-
-        msg = f"Output {pos_lh5}"
-        log.debug(msg)
-
-        # write
-        mode = "of" if idx == 0 else "append"
-        lh5.write(pos_lh5, "vtx/pos", out_file, wo_mode=mode)
-
-
-def generate_many_hpge_surface(
+def generate_hpge_surface_points(
     n_tot: int,
+    seed: int | None = None,
+    *,
     hpges: dict[str, legendhpges.HPGe],
     positions: dict[str, ArrayLike],
     surface_type: str | None = None,
-    seed: int | None = None,
 ) -> NDArray:
     """Generate events on many HPGe's weighting by the surface area.
 
@@ -114,8 +37,9 @@ def generate_many_hpge_surface(
 
     Returns
     -------
-    NDArray of global coordinates.
+    Array of global coordinates.
     """
+
     rng = np.random.default_rng(seed=seed)
 
     out = np.full((n_tot, 3), np.nan)

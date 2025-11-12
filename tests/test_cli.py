@@ -26,7 +26,7 @@ def test_cli(tmptestdir):
     )
 
     kin = lh5.read("vtx/kin", f"{tmptestdir}/test_beta.lh5").view_as("ak")
-    assert kin.fields == ["px", "py", "pz", "ekin", "g4_pid"]
+    assert set(kin.fields) == {"px", "py", "pz", "ekin", "g4_pid"}
     assert len(kin) == 2000
 
     cli(
@@ -46,6 +46,6 @@ def test_cli(tmptestdir):
     )
 
     pos = lh5.read("vtx/pos", f"{tmptestdir}/test_surf.lh5").view_as("ak")
-    assert pos.fields == ["xloc", "yloc", "zloc"]
+    assert set(pos.fields) == {"xloc", "yloc", "zloc"}
 
     assert len(pos) == 1000

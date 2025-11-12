@@ -5,6 +5,7 @@ import logging
 
 import pyg4ometry
 
+from revertex import core, utils
 from revertex.generators import beta, surface
 from revertex.utils import setup_log
 
@@ -137,11 +138,14 @@ def cli(args=None) -> None:
         # read the registry
         reg = pyg4ometry.gdml.Reader(args.gdml).getRegistry()
 
-        surface.save_surface_points(
-            size=args.n_events,
-            reg=reg,
-            out_file=args.out_file,
-            detectors=args.detectors,
+        hpges, pos = utils.get_hpges(reg, args.detectors)
+
+        core.save_vertices(
+            args.n_events,
+            args.out_file,
+            args.seed,
+            surface.generate_hpge_surface_points,
+            hpges=hpges,
+            positions=pos,
             surface_type=args.surface_type,
-            seed=args.seed,
         )
