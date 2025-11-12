@@ -44,14 +44,14 @@ def test_hpges():
 
     hpges, pos = utils.get_hpges(reg, ["B*"])
 
-    assert isinstance(hpges["BEGe"], legendhpges.base.HPGe)
-    assert isinstance(pos["BEGe"], list)
+    assert isinstance(hpges["B99000A"], legendhpges.base.HPGe)
+    assert isinstance(pos["B99000A"], list)
 
     # all
-    assert len(utils.get_surface_indices(hpges["BEGe"], None)) == 7
+    assert len(utils.get_surface_indices(hpges["B99000A"], None)) == 8
 
     # just nplus
-    assert len(utils.get_surface_indices(hpges["BEGe"], "nplus")) == 3
+    assert len(utils.get_surface_indices(hpges["B99000A"], "nplus")) == 3
 
     assert utils.get_surface_weights(hpges, None)[0] == 1.0
     assert utils.get_surface_weights(hpges, "nplus")[0] == 1.0
@@ -64,4 +64,4 @@ def test_borehole(test_data_configs):
     borehole_vol = utils.get_borehole_volume(hpge_IC)
     assert isinstance(borehole_vol, float)
 
-    assert utils.get_borehole_weights({"IC": hpge_IC})[0] == 1.0
+    assert utils.get_borehole_weights({"V99000A": hpge_IC})[0] == 1.0

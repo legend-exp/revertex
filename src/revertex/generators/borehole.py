@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 
 import legendhpges
 import numpy as np
@@ -15,8 +16,8 @@ def generate_hpge_borehole_points(
     n_tot: int,
     seed: int | None = None,
     *,
-    hpges: dict[str, legendhpges.HPGe],
-    positions: dict[str, ArrayLike],
+    hpges: dict[str, legendhpges.HPGe] | legendhpges.HPGe,
+    positions: dict[str, ArrayLike] | ArrayLike,
 ) -> NDArray:
     """Generate events on many HPGe boreholes weighting by the volume.
 
@@ -35,32 +36,34 @@ def generate_hpge_borehole_points(
     -------
     Array of global coordinates.
     """
-
-    weights = utils.get_borehole_weights(hpges)
-
     rng = np.random.default_rng(seed=seed)
 
     out = np.full((n_tot, 3), np.nan)
 
-    det_index = rng.choice(np.arange(len(hpges)), size=n_tot, p=weights)
-
     # loop over n_det maybe could be faster
-    for idx, (name, hpge) in enumerate(hpges.items()):
-        n = np.sum(det_index == idx)
+    if isinstance(hpges, Mapping):
+        weights = utils.get_borehole_weights(hpges)
 
-        out[det_index == idx] = (
-            generate_hpge_borehole(n, hpge, seed=seed) + positions[name]
-        )
+        det_index = rng.choice(np.arange(len(hpges)), size=n_tot, p=weights)
+
+        for idx, (name, hpge) in enumerate(hpges.items()):
+            n = np.sum(det_index == idx)
+
+            out[det_index == idx] = (
+                _hpge_borehole_points_impl(n, hpge, seed=seed) + positions[name]
+            )
+    else:
+        out = _hpge_borehole_points_impl(n_tot, hpges, seed=seed) + positions
 
     return out
 
 
-def generate_hpge_borehole(
+def _hpge_borehole_points_impl(
     size: int,
     hpge: legendhpges.HPGe,
     seed: int | None = None,
 ) -> NDArray:
-    """Generate events on the surface of the HPGe.
+    """Generate events on the surface of a single HPGe.
 
     Parameters
     ----------

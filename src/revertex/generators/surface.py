@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 
 import legendhpges
 import numpy as np
@@ -16,8 +17,8 @@ def generate_hpge_surface_points(
     n_tot: int,
     seed: int | None = None,
     *,
-    hpges: dict[str, legendhpges.HPGe],
-    positions: dict[str, ArrayLike],
+    hpges: dict[str, legendhpges.HPGe] | legendhpges.HPGe,
+    positions: dict[str, ArrayLike] | ArrayLike,
     surface_type: str | None = None,
 ) -> NDArray:
     """Generate events on many HPGe's weighting by the surface area.
@@ -44,31 +45,38 @@ def generate_hpge_surface_points(
 
     out = np.full((n_tot, 3), np.nan)
 
-    # index of the surfaces per detector
-    p_det = utils.get_surface_weights(hpges, surface_type=surface_type)
-
-    det_index = rng.choice(np.arange(len(hpges)), size=n_tot, p=p_det)
-
     # loop over n_det maybe could be faster
-    for idx, (name, hpge) in enumerate(hpges.items()):
-        n = np.sum(det_index == idx)
+    if isinstance(hpges, Mapping):
+        # index of the surfaces per detector
+        p_det = utils.get_surface_weights(hpges, surface_type=surface_type)
+        det_index = rng.choice(np.arange(len(hpges)), size=n_tot, p=p_det)
 
-        out[det_index == idx] = (
-            generate_hpge_surface(n, hpge, surface_type=surface_type, seed=seed)
-            + positions[name]
+        for idx, (name, hpge) in enumerate(hpges.items()):
+            n = np.sum(det_index == idx)
+
+            out[det_index == idx] = (
+                _hpge_surface_points_impl(n, hpge, surface_type=surface_type, seed=seed)
+                + positions[name]
+            )
+    else:
+        out = (
+            _hpge_surface_points_impl(
+                n_tot, hpges, surface_type=surface_type, seed=seed
+            )
+            + positions
         )
 
     return out
 
 
-def generate_hpge_surface(
+def _hpge_surface_points_impl(
     n: int,
     hpge: legendhpges.HPGe,
     surface_type: str | None,
     depth: rv_continuous | None = None,
     seed: int | None = None,
 ) -> NDArray:
-    """Generate events on the surface of the HPGe.
+    """Generate events on the surface of a single HPGe.
 
     Parameters
     ----------

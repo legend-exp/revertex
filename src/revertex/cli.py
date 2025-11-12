@@ -6,7 +6,7 @@ import logging
 import pyg4ometry
 
 from revertex import core, utils
-from revertex.generators import beta, surface
+from revertex.generators import beta, borehole, shell, surface
 from revertex.utils import setup_log
 
 log = logging.getLogger(__name__)
@@ -110,6 +110,89 @@ def cli(args=None) -> None:
         help="Number of events to generate",
     )
 
+    hpge_shell_parser = subparsers.add_parser(
+        "hpge-shell-pos", help="Generate samples from the shell of the HPGes"
+    )
+
+    hpge_shell_parser.add_argument(
+        "--gdml",
+        "-g",
+        required=True,
+        type=str,
+        help="Path to the GDML file of the geometry",
+    )
+    hpge_shell_parser.add_argument(
+        "--surface-type",
+        "-t",
+        required=True,
+        type=str,
+        help="Type of surface",
+    )
+    hpge_shell_parser.add_argument(
+        "--detectors",
+        "-d",
+        required=True,
+        nargs="+",
+        type=str,
+        help="Name of a detector, list of detectors or regex's.",
+    )
+    hpge_shell_parser.add_argument(
+        "--out-file",
+        "-o",
+        required=True,
+        type=str,
+        help="Path to the output file. ",
+    )
+    hpge_shell_parser.add_argument(
+        "--n-events",
+        "-n",
+        required=True,
+        type=int,
+        help="Number of events to generate",
+    )
+    hpge_shell_parser.add_argument(
+        "--radius",
+        "-r",
+        required=True,
+        type=float,
+        help="Radius of the shell to generate in",
+    )
+
+    hpge_borehole_parser = subparsers.add_parser(
+        "hpge-borehole-pos", help="Generate samples from the borehole of the HPGes"
+    )
+
+    hpge_borehole_parser.add_argument(
+        "--gdml",
+        "-g",
+        required=True,
+        type=str,
+        help="Path to the GDML file of the geometry",
+    )
+
+    hpge_borehole_parser.add_argument(
+        "--detectors",
+        "-d",
+        required=True,
+        nargs="+",
+        type=str,
+        help="Name of a detector, list of detectors or regex's.",
+    )
+    hpge_borehole_parser.add_argument(
+        "--out-file",
+        "-o",
+        required=True,
+        type=str,
+        help="Path to the output file. ",
+    )
+    hpge_borehole_parser.add_argument(
+        "--n-events",
+        "-n",
+        required=True,
+        type=int,
+        help="Number of events to generate",
+    )
+
     args = parser.parse_args(args)
 
     log_level = (None, logging.INFO, logging.DEBUG)[min(args.verbose, 2)]
@@ -148,4 +231,49 @@ def cli(args=None) -> None:
             hpges=hpges,
             positions=pos,
             surface_type=args.surface_type,
+        )
+    elif args.command == "hpge-shell-pos":
+        msg = "Generating points on the HPGes shells for \n"
+        msg += f"gdml:      {args.gdml} \n"
+        msg += f"output:    {args.out_file} \n"
+        msg += f"seed:      {args.seed} \n"
+        msg += f"detectors: {args.detectors} ({args.surface_type})"
+        msg += f"radius : {args.radius}"
+        log.info(msg)
+
+        # read the registry
+        reg = pyg4ometry.gdml.Reader(args.gdml).getRegistry()
+
+        hpges, pos = utils.get_hpges(reg, args.detectors)
+
+        core.write_remage_vtx(
+            args.n_events,
+            args.out_file,
+            args.seed,
+            shell.generate_hpge_shell_points,
+            hpges=hpges,
+            positions=pos,
+            distance=args.radius,
+            surface_type=args.surface_type,
+        )
+    elif args.command == "hpge-borehole-pos":
+        msg = "Generating points on the HPGes boreholes for \n"
+        msg += f"gdml:      {args.gdml} \n"
+        msg += f"output:    {args.out_file} \n"
+        msg += f"seed:      {args.seed} \n"
+        msg += f"detectors: {args.detectors}"
+        log.info(msg)
+
+        # read the registry
+        reg = pyg4ometry.gdml.Reader(args.gdml).getRegistry()
+
+        hpges, pos = utils.get_hpges(reg, args.detectors)
+
+        core.write_remage_vtx(
+            args.n_events,
+            args.out_file,
+            args.seed,
+            borehole.generate_hpge_borehole_points,
+            hpges=hpges,
+            positions=pos,
         )

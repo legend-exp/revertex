@@ -6,7 +6,10 @@ import pytest
 from legendtestdata import LegendTestData
 from pyg4ometry import geant4
 
-from revertex.generators.shell import generate_hpge_shell, generate_hpge_shell_points
+from revertex.generators.shell import (
+    _hpge_shell_points_impl,
+    generate_hpge_shell_points,
+)
 
 
 @pytest.fixture(scope="session")
@@ -19,12 +22,12 @@ def test_data_configs():
 def test_shell_gen(test_data_configs):
     hpge = legendhpges.make_hpge(test_data_configs + "/V99000A.json", registry=None)
 
-    coords = generate_hpge_shell(100, hpge, surface_type=None, distance=1)
+    coords = _hpge_shell_points_impl(100, hpge, surface_type=None, distance=1)
 
     assert np.shape(coords) == (100, 3)
 
 
-def test_many_surface_gen(test_data_configs):
+def test_many_shell_gen(test_data_configs):
     reg = geant4.Registry()
     hpge_IC = legendhpges.make_hpge(test_data_configs + "/V99000A.json", registry=reg)
     hpge_BG = legendhpges.make_hpge(test_data_configs + "/B99000A.json", registry=reg)
@@ -36,6 +39,14 @@ def test_many_surface_gen(test_data_configs):
         distance=2,
         hpges={"V99000A": hpge_IC, "B99000A": hpge_BG, "C99000A": hpge_SC},
         positions={"V99000A": [0, 0, 0], "B99000A": [0, 0, 0], "C99000A": [0, 0, 0]},
+    )
+
+    assert np.shape(coords) == (1000, 3)
+
+    # should also work for one hpge
+
+    coords = generate_hpge_shell_points(
+        1000, seed=None, distance=2, hpges=hpge_IC, positions=[0, 0, 0]
     )
 
     assert np.shape(coords) == (1000, 3)

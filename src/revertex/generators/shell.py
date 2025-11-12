@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Mapping
 
 import legendhpges
 import numpy as np
@@ -15,8 +16,8 @@ def generate_hpge_shell_points(
     n_tot: int,
     seed: int | None = None,
     *,
-    hpges: dict[str, legendhpges.HPGe],
-    positions: dict[str, ArrayLike],
+    hpges: dict[str, legendhpges.HPGe] | legendhpges.HPGe,
+    positions: dict[str, ArrayLike] | ArrayLike,
     distance: float,
     surface_type: str | None = None,
 ) -> NDArray:
@@ -44,33 +45,38 @@ def generate_hpge_shell_points(
 
     out = np.full((n_tot, 3), np.nan)
 
-    # get the weighting
-    p_det = utils.get_surface_weights(hpges, surface_type=surface_type)
+    if isinstance(hpges, Mapping):
+        p_det = utils.get_surface_weights(hpges, surface_type=surface_type)
+        det_index = rng.choice(np.arange(len(hpges)), size=n_tot, p=p_det)
 
-    det_index = rng.choice(np.arange(len(hpges)), size=n_tot, p=p_det)
+        for idx, (name, hpge) in enumerate(hpges.items()):
+            n = np.sum(det_index == idx)
 
-    # loop over n_det maybe could be faster
-    for idx, (name, hpge) in enumerate(hpges.items()):
-        n = np.sum(det_index == idx)
-
-        out[det_index == idx] = (
-            generate_hpge_shell(
-                n, hpge, distance=distance, surface_type=surface_type, seed=seed
+            out[det_index == idx] = (
+                _hpge_shell_points_impl(
+                    n, hpge, distance=distance, surface_type=surface_type, seed=seed
+                )
+                + positions[name]
             )
-            + positions[name]
-        )
 
+    else:
+        out = (
+            _hpge_shell_points_impl(
+                n_tot, hpges, distance=distance, surface_type=surface_type, seed=seed
+            )
+            + positions
+        )
     return out
 
 
-def generate_hpge_shell(
+def _hpge_shell_points_impl(
     size: int,
     hpge: legendhpges.HPGe,
     surface_type: str | None,
     distance: float,
     seed: int | None = None,
 ) -> NDArray:
-    """Generate events on a shell around the HPGe. This uses rejection sampling.
+    """Generate events on a shell around a single HPGe. This uses rejection sampling.
 
     Parameters
     ----------

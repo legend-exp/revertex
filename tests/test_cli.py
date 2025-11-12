@@ -49,3 +49,45 @@ def test_cli(tmptestdir):
     assert set(pos.fields) == {"xloc", "yloc", "zloc"}
 
     assert len(pos) == 1000
+
+    cli(
+        [
+            "hpge-shell-pos",
+            "-g",
+            f"{test_file_dir}/test_files/geom.gdml",
+            "-t",
+            "nplus",
+            "-d",
+            "B*",
+            "-r",
+            "2",
+            "-o",
+            f"{tmptestdir}/test_shell.lh5",
+            "-n",
+            "1000",
+        ]
+    )
+
+    pos = lh5.read("vtx/pos", f"{tmptestdir}/test_shell.lh5").view_as("ak")
+    assert set(pos.fields) == {"xloc", "yloc", "zloc"}
+
+    assert len(pos) == 1000
+
+    cli(
+        [
+            "hpge-borehole-pos",
+            "-g",
+            f"{test_file_dir}/test_files/geom.gdml",
+            "-d",
+            "V*",
+            "-o",
+            f"{tmptestdir}/test_bh.lh5",
+            "-n",
+            "1000",
+        ]
+    )
+
+    pos = lh5.read("vtx/pos", f"{tmptestdir}/test_bh.lh5").view_as("ak")
+    assert set(pos.fields) == {"xloc", "yloc", "zloc"}
+
+    assert len(pos) == 1000
