@@ -140,7 +140,7 @@ def cli(args=None) -> None:
 
         hpges, pos = utils.get_hpges(reg, args.detectors)
 
-        core.save_vertices(
+        core.write_remage_vtx(
             args.n_events,
             args.out_file,
             args.seed,

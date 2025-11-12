@@ -175,7 +175,7 @@ def convert_output(
     return out
 
 
-def save_vertices(
+def write_remage_vtx(
     n: int,
     out_file: str,
     seed: int | None,
@@ -183,7 +183,9 @@ def save_vertices(
     lunit: str = "mm",
     **kwargs,
 ) -> None:
-    """Save the vertices generatored by a particular vertex generator function
+    """Save the vertices generatored by a particular vertex generator function.
+
+    This follows the convention ` defined here <https://remage.readthedocs.io/en/stable/manual/generators.html#simulating-event-vertices-and-kinematics-from-external-files>`_
 
     Parameters
     ----------

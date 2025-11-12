@@ -54,8 +54,10 @@ def read_input_beta_csv(path: str, **kwargs) -> tuple[np.ndarray, np.ndarray]:
     return np.genfromtxt(path, **kwargs).T[0], np.genfromtxt(path, **kwargs).T[1]
 
 
-def get_hpges(reg: pg4.geant4.registry, detectors: str | list[str]):
-    """Extract the objects for each HPGe detector in `ref` and in the list of `detectors`"""
+def get_hpges(
+    reg: pg4.geant4.registry, detectors: str | list[str]
+) -> tuple[dict, dict]:
+    """Extract the objects for each HPGe detector in `reg` and in the list of `detectors`"""
 
     phy_vol_dict = reg.physicalVolumeDict
     det_list = expand_regex(list(phy_vol_dict.keys()), list(detectors))
