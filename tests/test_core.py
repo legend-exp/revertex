@@ -122,3 +122,8 @@ def test_sample_proportional_radius():
         np.zeros(10000), np.ones(10000), size=10000
     )
     assert len(samples) == 10000
+
+
+def test_sample_cylinder():
+    samples = core.sample_cylinder((0, 10), (-1, 11), 100, None)
+    assert samples.shape == (100, 3)

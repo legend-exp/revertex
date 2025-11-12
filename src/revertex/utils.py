@@ -70,6 +70,39 @@ def get_hpges(reg: pg4.geant4.registry, detectors: str | list[str]):
     return hpges, pos
 
 
+def get_surface_indices(hpge: legendhpges.base.HPGe, surface_type: str | None) -> tuple:
+    """Get which surface index corresponds to the desired surface type"""
+
+    surf = np.array(hpge.surfaces)
+    return (
+        np.where(surf == surface_type)[0]
+        if (surface_type is not None)
+        else np.arange(len(hpge.surfaces))
+    )
+
+
+def get_surface_weights(hpges: dict, surface_type: str | None) -> list:
+    """Get a weighting for each hpge in the `hpges` based on surface area
+    for a given `surface_type`
+    """
+
+    # index of the surfaces per detector
+    surf_ids_tot = [
+        np.array(hpge.surfaces) == surface_type
+        if surface_type is not None
+        else np.arange(len(hpge.surfaces))
+        for name, hpge in hpges.items()
+    ]
+
+    # total surface area per detector
+    surf_tot = [
+        np.sum(hpge.surface_area(surf_ids).magnitude)
+        for (name, hpge), surf_ids in zip(hpges.items(), surf_ids_tot)
+    ]
+
+    return surf_tot / np.sum(surf_tot)
+
+
 def setup_log(level: int | None = None) -> None:
     """Setup a colored logger for this package.
 

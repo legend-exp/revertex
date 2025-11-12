@@ -21,6 +21,41 @@ def _get_chunks(n: int, m: int) -> np.ndarray:
     )
 
 
+def sample_cylinder(
+    r_range: float,
+    z_range: tuple,
+    size: int,
+    seed: int | None,
+    phi_range: tuple = (0, 2 * np.pi),
+):
+    """Generate points in a cylinder, returns the points as a 2D array
+
+    Parameters
+    ----------
+    r_range
+        The range of `r` to sample.
+    z_range
+        The range of `z` to sample.
+    phi
+        The range of angles to sample.
+    size
+        The number of points to generate.
+    seed
+        The random seed for the rng.
+    """
+
+    rng = np.random.default_rng(seed=seed)
+
+    r = rng.uniform(low=r_range[0], high=r_range[1], size=size)
+    z = rng.uniform(low=z_range[0], high=z_range[1], size=size)
+    phi = rng.uniform(low=phi_range[0], high=phi_range[1], size=size)
+
+    x = r * np.cos(phi)
+    y = r * np.sin(phi)
+
+    return np.column_stack((x, y, z))
+
+
 def sample_histogram(
     histo: hist.Hist, size: int, *, seed: int | None = None
 ) -> np.ndarray:

@@ -27,7 +27,7 @@ def test_regex():
     assert utils.expand_regex(["B0", "V0"], ["B*"]) == ["B0"]
 
 
-def test_get_hpges():
+def test_hpges():
     test_file_dir = Path(__file__).parent
     gdml = f"{test_file_dir}/test_files/geom.gdml"
     reg = pyg4ometry.gdml.Reader(gdml).getRegistry()
@@ -36,3 +36,12 @@ def test_get_hpges():
 
     assert isinstance(hpges["BEGe"], legendhpges.base.HPGe)
     assert isinstance(pos["BEGe"], list)
+
+    # all
+    assert len(utils.get_surface_indices(hpges["BEGe"], None)) == 7
+
+    # just nplus
+    assert len(utils.get_surface_indices(hpges["BEGe"], "nplus")) == 3
+
+    assert utils.get_surface_weights(hpges, None)[0] == 1.0
+    assert utils.get_surface_weights(hpges, "nplus")[0] == 1.0

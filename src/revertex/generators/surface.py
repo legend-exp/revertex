@@ -7,7 +7,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import rv_continuous
 
-from revertex import core
+from revertex import core, utils
 
 log = logging.getLogger(__name__)
 
@@ -45,20 +45,7 @@ def generate_hpge_surface_points(
     out = np.full((n_tot, 3), np.nan)
 
     # index of the surfaces per detector
-    surf_ids_tot = [
-        np.array(hpge.surfaces) == surface_type
-        if surface_type is not None
-        else np.arange(len(hpge.surfaces))
-        for name, hpge in hpges.items()
-    ]
-
-    # total surface area per detector
-    surf_tot = [
-        np.sum(hpge.surface_area(surf_ids).magnitude)
-        for (name, hpge), surf_ids in zip(hpges.items(), surf_ids_tot)
-    ]
-
-    p_det = surf_tot / np.sum(surf_tot)
+    p_det = utils.get_surface_weights(hpges, surface_type=surface_type)
 
     det_index = rng.choice(np.arange(len(hpges)), size=n_tot, p=p_det)
 
@@ -106,14 +93,7 @@ def generate_hpge_surface(
         else np.random.default_rng()
     )
 
-    # get the indices (r,z) pairs
-
-    surf = np.array(hpge.surfaces)
-    surface_indices = (
-        np.where(surf == surface_type)[0]
-        if (surface_type is not None)
-        else np.arange(len(hpge.surfaces))
-    )
+    surface_indices = utils.get_surface_indices(hpge, surface_type)
 
     # surface areas
     areas = hpge.surface_area(surface_indices).magnitude
