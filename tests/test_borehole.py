@@ -18,7 +18,7 @@ def test_borehole_gen(test_data_configs):
 
     assert np.shape(
         generate_hpge_borehole_points(
-            1000, None, hpges={"IC": hpge}, positions={"IC": [0, 0, 0]}
+            1000, seed = None, hpges={"IC": hpge}, positions={"IC": [0, 0, 0]}
         )
     ) == (1000, 3)
 

@@ -1,7 +1,7 @@
 Welcome to revertex's documentation!
 ====================================
 
-*revertex* is a python package to generate event vertices for *remage* see  `link <https://remage.readthedocs.io/en/latest>`_
+*revertex* is a python package to generate event vertices for *remage* see  `link <https://remage.readthedocs.io>`_
 The package contains tools to generate a variety of different vertices both with dedicated python functions,
 and on the command line, following the specification defined `here <https://remage.readthedocs.io/en/latest/manual/generators.html#simulating-event-vertices-and-kinematics-from-external-files>`_
 

@@ -14,8 +14,8 @@ log = logging.getLogger(__name__)
 
 def generate_hpge_borehole_points(
     n_tot: int,
-    seed: int | None = None,
     *,
+    seed: int | None = None,
     hpges: dict[str, legendhpges.HPGe] | legendhpges.HPGe,
     positions: dict[str, ArrayLike] | ArrayLike,
 ) -> NDArray:
