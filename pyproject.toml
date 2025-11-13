@@ -36,7 +36,7 @@ dependencies = [
     "numpy",
     "awkward",
     "legend-pydataobj>=1.11.6",
-    "legend-pygeom-hpges>=0.8.1",
+    "legend-pygeom-hpges>=0.8.2",
     "legend-pygeom-tools",
     "reboost",
     "dbetto",
