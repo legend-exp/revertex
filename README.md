@@ -11,4 +11,8 @@
 ![License](https://img.shields.io/github/license/legend-exp/revertex)
 [![Read the Docs](https://img.shields.io/readthedocs/revertex?logo=readthedocs)](https://revertex.readthedocs.io)
 
-Generate Geant4 event vertices in Python.
+_revertex_ provides functionality to generate event vertices (primarily
+positions, but also kinematics) that can be read into _remage_ (see
+[link](https://remage.readthedocs.io/en/latest/manual/generators.html#simulating-event-vertices-and-kinematics-from-external-files))
+
+For more information see our [documentation](https://revertex.readthedocs.io)!

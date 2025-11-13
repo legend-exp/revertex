@@ -7,7 +7,7 @@ from lgdo import lh5
 from revertex.cli import cli
 
 
-def test_cli(tmptestdir):
+def test_cli(tmptestdir, test_gdml):
     test_file_dir = Path(__file__).parent
 
     # test cli for betas
@@ -26,14 +26,14 @@ def test_cli(tmptestdir):
     )
 
     kin = lh5.read("vtx/kin", f"{tmptestdir}/test_beta.lh5").view_as("ak")
-    assert kin.fields == ["px", "py", "pz", "ekin", "g4_pid"]
+    assert set(kin.fields) == {"px", "py", "pz", "ekin", "g4_pid"}
     assert len(kin) == 2000
 
     cli(
         [
             "hpge-surf-pos",
             "-g",
-            f"{test_file_dir}/test_files/geom.gdml",
+            test_gdml,
             "-t",
             "nplus",
             "-d",
@@ -46,6 +46,48 @@ def test_cli(tmptestdir):
     )
 
     pos = lh5.read("vtx/pos", f"{tmptestdir}/test_surf.lh5").view_as("ak")
-    assert pos.fields == ["xloc", "yloc", "zloc"]
+    assert set(pos.fields) == {"xloc", "yloc", "zloc"}
+
+    assert len(pos) == 1000
+
+    cli(
+        [
+            "hpge-shell-pos",
+            "-g",
+            test_gdml,
+            "-t",
+            "nplus",
+            "-d",
+            "B*",
+            "-r",
+            "2",
+            "-o",
+            f"{tmptestdir}/test_shell.lh5",
+            "-n",
+            "1000",
+        ]
+    )
+
+    pos = lh5.read("vtx/pos", f"{tmptestdir}/test_shell.lh5").view_as("ak")
+    assert set(pos.fields) == {"xloc", "yloc", "zloc"}
+
+    assert len(pos) == 1000
+
+    cli(
+        [
+            "hpge-borehole-pos",
+            "-g",
+            test_gdml,
+            "-d",
+            "V*",
+            "-o",
+            f"{tmptestdir}/test_bh.lh5",
+            "-n",
+            "1000",
+        ]
+    )
+
+    pos = lh5.read("vtx/pos", f"{tmptestdir}/test_bh.lh5").view_as("ak")
+    assert set(pos.fields) == {"xloc", "yloc", "zloc"}
 
     assert len(pos) == 1000

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import logging
+from typing import Callable
 
 import awkward as ak
 import hist
 import numpy as np
+from lgdo import lh5
 from lgdo.types import Array, Table
 from numpy.typing import ArrayLike
 
@@ -17,6 +19,43 @@ def _get_chunks(n: int, m: int) -> np.ndarray:
         if n % m == 0
         else np.append(np.full(n // m, m, dtype=int), n % m)
     )
+
+
+def sample_cylinder(
+    r_range: float,
+    z_range: tuple,
+    size: int,
+    seed: int | None,
+    phi_range: tuple = (0, 2 * np.pi),
+):
+    """Generate points in a cylinder, returns the points as a 2D array
+
+    Parameters
+    ----------
+    r_range
+        The range of `r` to sample.
+    z_range
+        The range of `z` to sample.
+    phi
+        The range of angles to sample.
+    size
+        The number of points to generate.
+    seed
+        The random seed for the rng.
+    """
+
+    rng = np.random.default_rng(seed=seed)
+
+    r2 = rng.uniform(low=r_range[0] ** 2, high=r_range[1] ** 2, size=size)
+    r = np.sqrt(r2)
+
+    z = rng.uniform(low=z_range[0], high=z_range[1], size=size)
+    phi = rng.uniform(low=phi_range[0], high=phi_range[1], size=size)
+
+    x = r * np.cos(phi)
+    y = r * np.sin(phi)
+
+    return np.column_stack((x, y, z))
 
 
 def sample_histogram(
@@ -136,6 +175,59 @@ def convert_output(
         raise ValueError(msg)
 
     return out
+
+
+def write_remage_vtx(
+    n: int,
+    out_file: str,
+    seed: int | None,
+    generator: Callable,
+    lunit: str = "mm",
+    **kwargs,
+) -> None:
+    """Save the vertices generatored by a particular vertex generator function.
+
+    This follows the convention ` defined here <https://remage.readthedocs.io/en/stable/manual/generators.html#simulating-event-vertices-and-kinematics-from-external-files>`_
+
+    Parameters
+    ----------
+    n
+        The number of vertices to generate
+    out_file
+        The path to the file to save the results.
+    seed
+        The seed to the random number generator
+    generator
+        A function generating the vertices (following the revertex specifications)
+    kwargs
+        The keyword arguments to the function
+
+    """
+
+    chunks = _get_chunks(n, 1000_000)
+
+    for idx, chunk in enumerate(chunks):
+        positions = generator(chunk, **kwargs)
+
+        pos_ak = ak.Array(
+            {"xloc": positions[:, 0], "yloc": positions[:, 1], "zloc": positions[:, 2]}
+        )
+
+        msg = f"Generated vertices {pos_ak}"
+        log.debug(msg)
+
+        # update the seed
+        seed = seed * 7 if seed is not None else None
+
+        # convert
+        pos_lh5 = convert_output(pos_ak, mode="pos", lunit=lunit)
+
+        msg = f"Output {pos_lh5}"
+        log.debug(msg)
+
+        # write
+        mode = "of" if idx == 0 else "append"
+        lh5.write(pos_lh5, "vtx/pos", out_file, wo_mode=mode)
 
 
 def sample_proportional_radius(

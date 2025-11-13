@@ -6,35 +6,35 @@ from collections.abc import Mapping
 import legendhpges
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
-from scipy.stats import rv_continuous
 
 from revertex import core, utils
 
 log = logging.getLogger(__name__)
 
 
-def sample_hpge_surface(
+def sample_hpge_shell(
     n_tot: int,
-    seed: int | None = None,
     *,
+    seed: int | None = None,
     hpges: dict[str, legendhpges.HPGe] | legendhpges.HPGe,
     positions: dict[str, ArrayLike] | ArrayLike,
+    distance: float,
     surface_type: str | None = None,
 ) -> NDArray:
-    """Generate events on many HPGe's weighting by the surface area.
+    """Generate events on many HPGe's shells weighting by the surface area.
 
     Parameters
     ----------
     n_tot
         total number of events to generate
+    seed
+        random seed for the RNG.
     hpges
         List of :class:`legendhpges.HPGe` objects.
     positions
         List of the origin position of each HPGe.
     surface_type
         Which surface to generate events on either `nplus`, `pplus`, `passive` or None (generate on all surfaces).
-    seed
-        seed for random number generator.
 
     Returns
     -------
@@ -45,9 +45,7 @@ def sample_hpge_surface(
 
     out = np.full((n_tot, 3), np.nan)
 
-    # loop over n_det maybe could be faster
     if isinstance(hpges, Mapping):
-        # index of the surfaces per detector
         p_det = utils.get_surface_weights(hpges, surface_type=surface_type)
         det_index = rng.choice(np.arange(len(hpges)), size=n_tot, p=p_det)
 
@@ -55,39 +53,41 @@ def sample_hpge_surface(
             n = np.sum(det_index == idx)
 
             out[det_index == idx] = (
-                _sample_hpge_surface_impl(n, hpge, surface_type=surface_type, seed=seed)
+                _sample_hpge_shell_impl(
+                    n, hpge, distance=distance, surface_type=surface_type, seed=seed
+                )
                 + positions[name]
             )
+
     else:
         out = (
-            _sample_hpge_surface_impl(
-                n_tot, hpges, surface_type=surface_type, seed=seed
+            _sample_hpge_shell_impl(
+                n_tot, hpges, distance=distance, surface_type=surface_type, seed=seed
             )
             + positions
         )
-
     return out
 
 
-def _sample_hpge_surface_impl(
-    n: int,
+def _sample_hpge_shell_impl(
+    size: int,
     hpge: legendhpges.HPGe,
     surface_type: str | None,
-    depth: rv_continuous | None = None,
+    distance: float,
     seed: int | None = None,
 ) -> NDArray:
-    """Generate events on the surface of a single HPGe.
+    """Generate events on a shell around a single HPGe. This uses rejection sampling.
 
     Parameters
     ----------
-    n
+    size
         number of vertexs to generate.
     hpge
         legendhpges object describing the detector geometry.
     surface_type
         Which surface to generate events on either `nplus`, `pplus`, `passive` or None (generate on all surfaces).
-    depth
-        scipy `rv_continuous` object describing the depth profile, if None events are generated directly on the surface.
+    distance
+        Size of the hpge shell to generate in.
     seed
         seed for random number generator.
 
@@ -95,39 +95,43 @@ def _sample_hpge_surface_impl(
     -------
     Array with shape `(n,3)` describing the local `(x,y,z)` positions for every vertex
     """
-    rng = (
-        np.random.default_rng(seed=seed)
-        if seed is not None
-        else np.random.default_rng()
-    )
 
+    # get the surface indices (which sides to use)
     surface_indices = utils.get_surface_indices(hpge, surface_type)
 
-    # surface areas
-    areas = hpge.surface_area(surface_indices).magnitude
+    # the bounding box should be in x +/- (radius+distance)
+    # and in y -distance to height + distance
 
-    # get the sides
-    sides = rng.choice(surface_indices, size=n, p=areas / np.sum(areas))
-    # get thhe detector geometry
     r, z = hpge.get_profile()
-    s1, s2 = legendhpges.utils.get_line_segments(r, z)
 
-    # compute random coordinates
-    r1 = s1[sides][:, 0]
-    r2 = s2[sides][:, 0]
+    height = max(z)
+    radius = max(r)
 
-    frac = core.sample_proportional_radius(r1, r2, size=(len(sides)))
+    output = None
 
-    rz_coords = s1[sides] + (s2[sides] - s1[sides]) * frac[:, np.newaxis]
+    # sampling efficiency is not necessarily high but hopefully this is not a big limitation
+    seed_tmp = seed
 
-    phi = rng.uniform(low=0, high=2 * np.pi, size=(len(sides)))
+    while output is None or (len(output) < size):
+        # adjust seed
+        seed_tmp = seed_tmp * 7 if seed_tmp is not None else seed
 
-    # convert to random x,y
-    x = rz_coords[:, 0] * np.cos(phi)
-    y = rz_coords[:, 0] * np.sin(phi)
+        # get some proposed points
+        proposals = core.sample_cylinder(
+            r_range=(0, radius + distance),
+            z_range=(-distance, height + distance),
+            size=size * 5,
+            seed=seed_tmp,
+        )
 
-    if depth is not None:
-        msg = "depth profile is not yet implemented "
-        raise NotImplementedError(msg)
+        distances = hpge.distance_to_surface(proposals, surface_indices, signed=True)
 
-    return np.vstack([x, y, rz_coords[:, 1]]).T
+        # should be negative (outside) and > -distance
+        is_good = (distances < 0) & (abs(distances) < distance)
+        sel = proposals[is_good]
+
+        # extend
+        output = np.vstack((output, sel)) if output is not None else sel
+
+    # now cut to the right size
+    return output[:size]
