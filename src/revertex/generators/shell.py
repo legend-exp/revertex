@@ -12,7 +12,7 @@ from revertex import core, utils
 log = logging.getLogger(__name__)
 
 
-def generate_hpge_shell_points(
+def sample_hpge_shell(
     n_tot: int,
     *,
     seed: int | None = None,
@@ -53,7 +53,7 @@ def generate_hpge_shell_points(
             n = np.sum(det_index == idx)
 
             out[det_index == idx] = (
-                _hpge_shell_points_impl(
+                _sample_hpge_shell_impl(
                     n, hpge, distance=distance, surface_type=surface_type, seed=seed
                 )
                 + positions[name]
@@ -61,7 +61,7 @@ def generate_hpge_shell_points(
 
     else:
         out = (
-            _hpge_shell_points_impl(
+            _sample_hpge_shell_impl(
                 n_tot, hpges, distance=distance, surface_type=surface_type, seed=seed
             )
             + positions
@@ -69,7 +69,7 @@ def generate_hpge_shell_points(
     return out
 
 
-def _hpge_shell_points_impl(
+def _sample_hpge_shell_impl(
     size: int,
     hpge: legendhpges.HPGe,
     surface_type: str | None,

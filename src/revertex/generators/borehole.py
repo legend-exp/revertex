@@ -12,7 +12,7 @@ from revertex import core, utils
 log = logging.getLogger(__name__)
 
 
-def generate_hpge_borehole_points(
+def sample_hpge_borehole(
     n_tot: int,
     *,
     seed: int | None = None,
@@ -50,15 +50,15 @@ def generate_hpge_borehole_points(
             n = np.sum(det_index == idx)
 
             out[det_index == idx] = (
-                _hpge_borehole_points_impl(n, hpge, seed=seed) + positions[name]
+                _sample_hpge_borehole_impl(n, hpge, seed=seed) + positions[name]
             )
     else:
-        out = _hpge_borehole_points_impl(n_tot, hpges, seed=seed) + positions
+        out = _sample_hpge_borehole_impl(n_tot, hpges, seed=seed) + positions
 
     return out
 
 
-def _hpge_borehole_points_impl(
+def _sample_hpge_borehole_impl(
     size: int,
     hpge: legendhpges.HPGe,
     seed: int | None = None,

@@ -13,7 +13,7 @@ from revertex import core, utils
 log = logging.getLogger(__name__)
 
 
-def generate_hpge_surface_points(
+def sample_hpge_surface(
     n_tot: int,
     seed: int | None = None,
     *,
@@ -55,12 +55,12 @@ def generate_hpge_surface_points(
             n = np.sum(det_index == idx)
 
             out[det_index == idx] = (
-                _hpge_surface_points_impl(n, hpge, surface_type=surface_type, seed=seed)
+                _sample_hpge_surface_impl(n, hpge, surface_type=surface_type, seed=seed)
                 + positions[name]
             )
     else:
         out = (
-            _hpge_surface_points_impl(
+            _sample_hpge_surface_impl(
                 n_tot, hpges, surface_type=surface_type, seed=seed
             )
             + positions
@@ -69,7 +69,7 @@ def generate_hpge_surface_points(
     return out
 
 
-def _hpge_surface_points_impl(
+def _sample_hpge_surface_impl(
     n: int,
     hpge: legendhpges.HPGe,
     surface_type: str | None,

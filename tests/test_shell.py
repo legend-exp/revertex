@@ -5,15 +5,15 @@ import numpy as np
 from pyg4ometry import geant4
 
 from revertex.generators.shell import (
-    _hpge_shell_points_impl,
-    generate_hpge_shell_points,
+    _sample_hpge_shell_impl,
+    sample_hpge_shell,
 )
 
 
 def test_shell_gen(test_data_configs):
     hpge = legendhpges.make_hpge(test_data_configs + "/V99000A.yaml", registry=None)
 
-    coords = _hpge_shell_points_impl(100, hpge, surface_type=None, distance=1)
+    coords = _sample_hpge_shell_impl(100, hpge, surface_type=None, distance=1)
 
     assert np.shape(coords) == (100, 3)
 
@@ -24,7 +24,7 @@ def test_many_shell_gen(test_data_configs):
     hpge_BG = legendhpges.make_hpge(test_data_configs + "/B99000A.yaml", registry=reg)
     hpge_SC = legendhpges.make_hpge(test_data_configs + "/C99000A.yaml", registry=reg)
 
-    coords = generate_hpge_shell_points(
+    coords = sample_hpge_shell(
         1000,
         seed=None,
         distance=2,
@@ -36,7 +36,7 @@ def test_many_shell_gen(test_data_configs):
 
     # should also work for one hpge
 
-    coords = generate_hpge_shell_points(
+    coords = sample_hpge_shell(
         1000, seed=None, distance=2, hpges=hpge_IC, positions=[0, 0, 0]
     )
 
