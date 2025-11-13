@@ -18,14 +18,12 @@ def test_borehole_gen(test_data_configs):
 
     assert np.shape(
         sample_hpge_borehole(
-            1000, seed = None, hpges={"IC": hpge}, positions={"IC": [0, 0, 0]}
+            1000, seed=None, hpges={"IC": hpge}, positions={"IC": [0, 0, 0]}
         )
     ) == (1000, 3)
 
     # should also work for one hpge
 
-    coords = sample_hpge_borehole(
-        1000, seed=None, hpges=hpge, positions=[0, 0, 0]
-    )
+    coords = sample_hpge_borehole(1000, seed=None, hpges=hpge, positions=[0, 0, 0])
 
     assert np.shape(coords) == (1000, 3)
