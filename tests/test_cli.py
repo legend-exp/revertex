@@ -7,7 +7,7 @@ from lgdo import lh5
 from revertex.cli import cli
 
 
-def test_cli(tmptestdir):
+def test_cli(tmptestdir, test_gdml):
     test_file_dir = Path(__file__).parent
 
     # test cli for betas
@@ -33,7 +33,7 @@ def test_cli(tmptestdir):
         [
             "hpge-surf-pos",
             "-g",
-            f"{test_file_dir}/test_files/geom.gdml",
+            test_gdml,
             "-t",
             "nplus",
             "-d",
@@ -54,7 +54,7 @@ def test_cli(tmptestdir):
         [
             "hpge-shell-pos",
             "-g",
-            f"{test_file_dir}/test_files/geom.gdml",
+            test_gdml,
             "-t",
             "nplus",
             "-d",
@@ -77,7 +77,7 @@ def test_cli(tmptestdir):
         [
             "hpge-borehole-pos",
             "-g",
-            f"{test_file_dir}/test_files/geom.gdml",
+            test_gdml,
             "-d",
             "V*",
             "-o",

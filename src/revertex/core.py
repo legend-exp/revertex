@@ -46,9 +46,9 @@ def sample_cylinder(
 
     rng = np.random.default_rng(seed=seed)
 
-    r2 = rng.uniform(low=r_range[0]**2, high=r_range[1]**2, size=size)
+    r2 = rng.uniform(low=r_range[0] ** 2, high=r_range[1] ** 2, size=size)
     r = np.sqrt(r2)
-    
+
     z = rng.uniform(low=z_range[0], high=z_range[1], size=size)
     phi = rng.uniform(low=phi_range[0], high=phi_range[1], size=size)
 

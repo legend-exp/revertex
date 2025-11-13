@@ -120,15 +120,14 @@ def _hpge_shell_points_impl(
         proposals = core.sample_cylinder(
             r_range=(0, radius + distance),
             z_range=(-distance, height + distance),
-            size=size,
+            size=size * 5,
             seed=seed_tmp,
         )
 
         distances = hpge.distance_to_surface(proposals, surface_indices, signed=True)
 
         # should be negative (outside) and > -distance
-        is_good = (distances < 0) & (distances > -distance)
-
+        is_good = (distances < 0) & (abs(distances) < distance)
         sel = proposals[is_good]
 
         # extend

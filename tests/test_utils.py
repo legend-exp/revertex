@@ -5,19 +5,10 @@ from pathlib import Path
 import legendhpges
 import numpy as np
 import pyg4ometry
-import pytest
-from legendtestdata import LegendTestData
 from pyg4ometry import geant4
 
 from revertex import utils
 from revertex.utils import read_input_beta_csv
-
-
-@pytest.fixture(scope="session")
-def test_data_configs():
-    ldata = LegendTestData()
-    ldata.checkout("5f9b368")
-    return ldata.get_path("legend/metadata/hardware/detectors/germanium/diodes")
 
 
 def test_read():
@@ -59,7 +50,7 @@ def test_hpges():
 
 def test_borehole(test_data_configs):
     reg = geant4.Registry()
-    hpge_IC = legendhpges.make_hpge(test_data_configs + "/V99000A.json", registry=reg)
+    hpge_IC = legendhpges.make_hpge(test_data_configs + "/V99000A.yaml", registry=reg)
 
     borehole_vol = utils.get_borehole_volume(hpge_IC)
     assert isinstance(borehole_vol, float)

@@ -2,8 +2,6 @@ from __future__ import annotations
 
 import legendhpges
 import numpy as np
-import pytest
-from legendtestdata import LegendTestData
 
 from revertex.generators.borehole import (
     _hpge_borehole_points_impl,
@@ -11,15 +9,8 @@ from revertex.generators.borehole import (
 )
 
 
-@pytest.fixture(scope="session")
-def test_data_configs():
-    ldata = LegendTestData()
-    ldata.checkout("5f9b368")
-    return ldata.get_path("legend/metadata/hardware/detectors/germanium/diodes")
-
-
 def test_borehole_gen(test_data_configs):
-    hpge = legendhpges.make_hpge(test_data_configs + "/V99000A.json", registry=None)
+    hpge = legendhpges.make_hpge(test_data_configs + "/V99000A.yaml", registry=None)
 
     coords = _hpge_borehole_points_impl(100, hpge)
 
