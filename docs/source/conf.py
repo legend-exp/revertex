@@ -1,16 +1,15 @@
 # Configuration file for the Sphinx documentation builder.
 from __future__ import annotations
 
+import importlib.metadata
 import sys
 from pathlib import Path
-
-from pkg_resources import get_distribution
 
 sys.path.insert(0, Path(__file__).parents[2].resolve().as_posix())
 
 project = "revertex"
 copyright = "The LEGEND Collaboration"
-version = get_distribution("revertex").version
+version = importlib.metadata.version("revertex")
 
 extensions = [
     "sphinx.ext.githubpages",
