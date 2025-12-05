@@ -7,8 +7,8 @@ from pathlib import Path
 from tempfile import gettempdir
 
 import dbetto
-import legendhpges as hpges
 import pyg4ometry as pg4
+import pygeomhpges as hpges
 import pygeomtools
 import pytest
 from legendtestdata import LegendTestData

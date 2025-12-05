@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 
-import legendhpges
 import numpy as np
+import pygeomhpges
 from numpy.typing import ArrayLike, NDArray
 
 from revertex import core, utils
@@ -16,7 +16,7 @@ def sample_hpge_shell(
     n_tot: int,
     *,
     seed: int | None = None,
-    hpges: dict[str, legendhpges.HPGe] | legendhpges.HPGe,
+    hpges: dict[str, pygeomhpges.HPGe] | pygeomhpges.HPGe,
     positions: dict[str, ArrayLike] | ArrayLike,
     distance: float,
     surface_type: str | None = None,
@@ -30,7 +30,7 @@ def sample_hpge_shell(
     seed
         random seed for the RNG.
     hpges
-        List of :class:`legendhpges.HPGe` objects.
+        List of :class:`pygeomhpges.HPGe` objects.
     positions
         List of the origin position of each HPGe.
     surface_type
@@ -71,7 +71,7 @@ def sample_hpge_shell(
 
 def _sample_hpge_shell_impl(
     size: int,
-    hpge: legendhpges.HPGe,
+    hpge: pygeomhpges.HPGe,
     surface_type: str | None,
     distance: float,
     seed: int | None = None,
@@ -83,7 +83,7 @@ def _sample_hpge_shell_impl(
     size
         number of vertexs to generate.
     hpge
-        legendhpges object describing the detector geometry.
+        pygeomhpges object describing the detector geometry.
     surface_type
         Which surface to generate events on either `nplus`, `pplus`, `passive` or None (generate on all surfaces).
     distance

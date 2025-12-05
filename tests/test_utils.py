@@ -2,9 +2,9 @@ from __future__ import annotations
 
 from pathlib import Path
 
-import legendhpges
 import numpy as np
 import pyg4ometry
+import pygeomhpges
 from pyg4ometry import geant4
 
 from revertex import utils
@@ -35,7 +35,7 @@ def test_hpges():
 
     hpges, pos = utils.get_hpges(reg, ["B*"])
 
-    assert isinstance(hpges["B99000A"], legendhpges.base.HPGe)
+    assert isinstance(hpges["B99000A"], pygeomhpges.base.HPGe)
     assert isinstance(pos["B99000A"], list)
 
     # all
@@ -50,7 +50,7 @@ def test_hpges():
 
 def test_borehole(test_data_configs):
     reg = geant4.Registry()
-    hpge_IC = legendhpges.make_hpge(test_data_configs + "/V99000A.yaml", registry=reg)
+    hpge_IC = pygeomhpges.make_hpge(test_data_configs + "/V99000A.yaml", registry=reg)
 
     borehole_vol = utils.get_borehole_volume(hpge_IC)
     assert isinstance(borehole_vol, float)

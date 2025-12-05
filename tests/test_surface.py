@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import legendhpges
 import numpy as np
+import pygeomhpges
 from pyg4ometry import geant4
 
 from revertex.generators.surface import (
@@ -11,7 +11,7 @@ from revertex.generators.surface import (
 
 
 def test_surface_gen(test_data_configs):
-    hpge = legendhpges.make_hpge(test_data_configs + "/V99000A.yaml", registry=None)
+    hpge = pygeomhpges.make_hpge(test_data_configs + "/V99000A.yaml", registry=None)
 
     coords = _sample_hpge_surface_impl(100, hpge, surface_type=None, depth=None)
     assert np.shape(coords) == (100, 3)
@@ -32,9 +32,9 @@ def test_surface_gen(test_data_configs):
 
 def test_many_surface_gen(test_data_configs):
     reg = geant4.Registry()
-    hpge_IC = legendhpges.make_hpge(test_data_configs + "/V99000A.yaml", registry=reg)
-    hpge_BG = legendhpges.make_hpge(test_data_configs + "/B99000A.yaml", registry=reg)
-    hpge_SC = legendhpges.make_hpge(test_data_configs + "/C99000A.yaml", registry=reg)
+    hpge_IC = pygeomhpges.make_hpge(test_data_configs + "/V99000A.yaml", registry=reg)
+    hpge_BG = pygeomhpges.make_hpge(test_data_configs + "/B99000A.yaml", registry=reg)
+    hpge_SC = pygeomhpges.make_hpge(test_data_configs + "/C99000A.yaml", registry=reg)
 
     coords = sample_hpge_surface(
         1000,
