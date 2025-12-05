@@ -1,7 +1,7 @@
 from __future__ import annotations
 
-import legendhpges
 import numpy as np
+import pygeomhpges
 
 from revertex.generators.borehole import (
     _sample_hpge_borehole_impl,
@@ -10,7 +10,7 @@ from revertex.generators.borehole import (
 
 
 def test_borehole_gen(test_data_configs):
-    hpge = legendhpges.make_hpge(test_data_configs + "/V99000A.yaml", registry=None)
+    hpge = pygeomhpges.make_hpge(test_data_configs + "/V99000A.yaml", registry=None)
 
     coords = _sample_hpge_borehole_impl(100, hpge)
 

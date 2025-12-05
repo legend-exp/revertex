@@ -4,9 +4,9 @@ import logging
 import re
 
 import colorlog
-import legendhpges
 import numpy as np
 import pyg4ometry.geant4 as pg4
+import pygeomhpges
 import pygeomtools
 
 from revertex import core
@@ -63,7 +63,7 @@ def get_hpges(
     det_list = expand_regex(list(phy_vol_dict.keys()), list(detectors))
 
     hpges = {
-        name: legendhpges.make_hpge(
+        name: pygeomhpges.make_hpge(
             pygeomtools.get_sensvol_metadata(reg, name), registry=None
         )
         for name in det_list
@@ -74,7 +74,7 @@ def get_hpges(
     return hpges, pos
 
 
-def get_surface_indices(hpge: legendhpges.base.HPGe, surface_type: str | None) -> tuple:
+def get_surface_indices(hpge: pygeomhpges.base.HPGe, surface_type: str | None) -> tuple:
     """Get which surface index corresponds to the desired surface type"""
 
     surf = np.array(hpge.surfaces)
@@ -107,7 +107,7 @@ def get_surface_weights(hpges: dict, surface_type: str | None) -> list:
     return surf_tot / np.sum(surf_tot)
 
 
-def get_borehole_volume(hpge: legendhpges.HPGe, size=1000000):
+def get_borehole_volume(hpge: pygeomhpges.HPGe, size=1000000):
     """Estimate the borehole volume (with MC)"""
 
     r, z = hpge.get_profile()

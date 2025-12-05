@@ -3,8 +3,8 @@ from __future__ import annotations
 import logging
 from collections.abc import Mapping
 
-import legendhpges
 import numpy as np
+import pygeomhpges
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import rv_continuous
 
@@ -17,7 +17,7 @@ def sample_hpge_surface(
     n_tot: int,
     seed: int | None = None,
     *,
-    hpges: dict[str, legendhpges.HPGe] | legendhpges.HPGe,
+    hpges: dict[str, pygeomhpges.HPGe] | pygeomhpges.HPGe,
     positions: dict[str, ArrayLike] | ArrayLike,
     surface_type: str | None = None,
 ) -> NDArray:
@@ -28,7 +28,7 @@ def sample_hpge_surface(
     n_tot
         total number of events to generate
     hpges
-        List of :class:`legendhpges.HPGe` objects.
+        List of :class:`pygeomhpges.HPGe` objects.
     positions
         List of the origin position of each HPGe.
     surface_type
@@ -71,7 +71,7 @@ def sample_hpge_surface(
 
 def _sample_hpge_surface_impl(
     n: int,
-    hpge: legendhpges.HPGe,
+    hpge: pygeomhpges.HPGe,
     surface_type: str | None,
     depth: rv_continuous | None = None,
     seed: int | None = None,
@@ -83,7 +83,7 @@ def _sample_hpge_surface_impl(
     n
         number of vertexs to generate.
     hpge
-        legendhpges object describing the detector geometry.
+        pygeomhpges object describing the detector geometry.
     surface_type
         Which surface to generate events on either `nplus`, `pplus`, `passive` or None (generate on all surfaces).
     depth
@@ -110,7 +110,7 @@ def _sample_hpge_surface_impl(
     sides = rng.choice(surface_indices, size=n, p=areas / np.sum(areas))
     # get thhe detector geometry
     r, z = hpge.get_profile()
-    s1, s2 = legendhpges.utils.get_line_segments(r, z)
+    s1, s2 = pygeomhpges.utils.get_line_segments(r, z)
 
     # compute random coordinates
     r1 = s1[sides][:, 0]
