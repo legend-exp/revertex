@@ -101,7 +101,7 @@ def get_surface_weights(hpges: dict, surface_type: str | None) -> list:
     # total surface area per detector
     surf_tot = [
         np.sum(hpge.surface_area(surf_ids).magnitude)
-        for (name, hpge), surf_ids in zip(hpges.items(), surf_ids_tot)
+        for (name, hpge), surf_ids in zip(hpges.items(), surf_ids_tot, strict=True)
     ]
 
     return surf_tot / np.sum(surf_tot)
