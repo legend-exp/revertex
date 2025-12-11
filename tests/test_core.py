@@ -97,24 +97,48 @@ def test_hist_sample_two_dim():
     assert sigma < 5
 
 
-def test_convert():
+def test_convert_pos():
     arr = ak.Array({"xloc": [1, 2, 3], "yloc": [1, 2, 3], "zloc": [1, 2, 3]})
+    converted = core.convert_output_pos(arr).view_as("ak")
 
     for f in arr.fields:
-        assert ak.all(core.convert_output(arr, mode="pos").view_as("ak")[f] == arr[f])
+        assert ak.all(converted[f] == arr[f])
 
+
+def test_convert_kin():
+    # single particle in each event.
     arr = ak.Array(
         {
             "px": [1, 2, 3],
             "py": [1, 2, 3],
             "pz": [1, 2, 3],
+            "time": [1, 2, 3],
             "ekin": [1, 2, 3],
             "g4_pid": [11, 11, 11],
         }
     )
+    converted = core.convert_output_kin(arr).view_as("ak")
 
     for f in arr.fields:
-        assert ak.all(core.convert_output(arr, mode="kin").view_as("ak")[f] == arr[f])
+        assert ak.all(converted[f] == arr[f])
+    assert ak.all(converted["n_part"] == ak.Array([1, 1, 1]))
+
+    # multiple particles.
+    arr = ak.Array(
+        {
+            "px": [[1, 2], [3, 4], [5]],
+            "py": [[1, 2], [3, 4], [5]],
+            "pz": [[1, 2], [3, 4], [5]],
+            "time": [[1, 2], [3, 4], [5]],
+            "ekin": [[1, 2], [3, 4], [5]],
+            "g4_pid": [[11, 11], [11, 11], [22]],
+        }
+    )
+    converted = core.convert_output_kin(arr).view_as("ak")
+
+    for f in arr.fields:
+        assert ak.all(converted[f] == ak.flatten(arr[f]))
+    assert ak.all(converted["n_part"] == ak.Array([2, 0, 2, 0, 1]))
 
 
 def test_sample_proportional_radius():

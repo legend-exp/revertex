@@ -10,7 +10,7 @@ from numpy.typing import ArrayLike
 from scipy.spatial.transform import Rotation as rot
 
 from revertex import utils
-from revertex.core import _get_chunks, convert_output, sample_histogram
+from revertex.core import _get_chunks, convert_output_kin, sample_histogram
 
 log = logging.getLogger(__name__)
 
@@ -57,7 +57,7 @@ def save_beta_spectrum(
         seed = seed * 7 if seed is not None else None
 
         # convert
-        kin_lh5 = convert_output(kin_ak, mode="kin", eunit=eunit)
+        kin_lh5 = convert_output_kin(kin_ak, eunit=eunit)
 
         # write
         mode = "of" if idx == 0 else "append"
@@ -132,6 +132,7 @@ def generate_beta_spectrum(
             "py": momenta[1, :],
             "pz": momenta[2, :],
             "ekin": energy_samples,
+            "time": np.zeros_like(energy_samples),
             "g4_pid": np.full_like(energy_samples, 11),
         }
     )

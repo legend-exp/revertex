@@ -26,7 +26,7 @@ def test_cli(tmptestdir, test_gdml):
     )
 
     kin = lh5.read("vtx/kin", f"{tmptestdir}/test_beta.lh5").view_as("ak")
-    assert set(kin.fields) == {"px", "py", "pz", "ekin", "g4_pid"}
+    assert set(kin.fields) == {"px", "py", "pz", "ekin", "time", "g4_pid", "n_part"}
     assert len(kin) == 2000
 
     cli(

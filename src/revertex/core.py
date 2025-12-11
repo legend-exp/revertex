@@ -134,23 +134,19 @@ def sample_histogram(
     raise ValueError(msg)
 
 
-def convert_output(
-    arr: ak.Array, *, mode: str = "pos", lunit: str = "mm", eunit: str = "keV"
+def convert_output_pos(
+    arr: ak.Array,
+    *,
+    lunit: str = "mm",
 ) -> Table:
-    """Converts the vertices to the correct output format.
-
-    This function creates a table of either `kin` or `pos` information.
+    """Converts the vertices to the correct output format for `pos` information.
 
     Parameters
     ----------
     arr
         The input data to convert
-    mode
-        The mode either 'pos' or 'kin'
     lunit
         Unit for distances, by default mm.
-    eunit
-        Unit for energy, by default keV.
 
     Returns
     -------
@@ -158,21 +154,65 @@ def convert_output(
     """
     out = Table(size=len(arr))
 
-    if mode == "pos":
-        for field in ["xloc", "yloc", "zloc"]:
-            out.add_field(field, Array(arr[field].to_numpy(), attrs={"units": lunit}))
+    for field in ["xloc", "yloc", "zloc"]:
+        assert arr[field].ndim == 1
+        out.add_field(field, Array(arr[field].to_numpy(), attrs={"units": lunit}))
 
-    elif mode == "kin":
-        for field in ["px", "py", "pz", "ekin"]:
-            unit = eunit if field == "ekin" else ""
-            out.add_field(field, Array(arr[field].to_numpy(), attrs={"units": unit}))
+    return out
 
-        out.add_field(
-            "g4_pid", Array(arr["g4_pid"].to_numpy().astype(np.int64), dtype=np.int64)
-        )
-    else:
-        msg = f"Only modes pos or kin are supported for converting outputs not {mode}"
-        raise ValueError(msg)
+
+def convert_output_kin(
+    arr: ak.Array,
+    *,
+    eunit: str = "keV",
+    tunit: str = "ns",
+) -> Table:
+    """Converts the vertices to the correct output format for `kin` information.
+
+    This follows the convention `defined by remage <remage:manual-input-kinetics>`__
+
+    Parameters
+    ----------
+    arr
+        The input data to convert
+    eunit
+        Unit for energy, by default keV.
+    tunit
+        Unit for time, by default ns.
+
+    Returns
+    -------
+    The output table.
+    """
+    lens = []
+    for field in ak.fields(arr):
+        lens.append(ak.count(arr[field], axis=None))
+    assert all(x == lens[0] for x in lens)
+    out = Table(size=lens[0])
+
+    for field in ["px", "py", "pz", "ekin", "time"]:
+        assert arr[field].ndim in (1, 2)
+        unit = eunit if field == "ekin" else ""
+        unit = tunit if field == "time" else ""
+        col = ak.flatten(arr[field]) if arr[field].ndim > 1 else arr[field]
+        assert col.ndim == 1
+        out.add_field(field, Array(col.to_numpy(), attrs={"units": unit}))
+
+    for field in ["g4_pid"]:
+        assert arr[field].ndim in (1, 2)
+        col = ak.flatten(arr[field]) if arr[field].ndim > 1 else arr[field]
+        assert col.ndim == 1
+        out.add_field(field, Array(col.to_numpy().astype(np.int64), dtype=np.int64))
+
+    # derive the number of particles in each event.
+    n_part = np.zeros(lens[0], dtype=np.int64)
+    part_idx = 0
+    for x in arr["px"]:
+        part_evt = len(x) if isinstance(x, ak.Array) else 1
+        n_part[part_idx] = part_evt
+        part_idx += part_evt
+
+    out.add_field("n_part", Array(n_part, dtype=np.int64))
 
     return out
 
@@ -187,7 +227,7 @@ def write_remage_vtx(
 ) -> None:
     """Save the vertices generatored by a particular vertex generator function.
 
-    This follows the convention ` defined here <https://remage.readthedocs.io/en/stable/manual/generators.html#simulating-event-vertices-and-kinematics-from-external-files>`_
+    This follows the convention :ref:`defined by remage <remage:manual-input-vertex>`.
 
     Parameters
     ----------
@@ -220,7 +260,7 @@ def write_remage_vtx(
         seed = seed * 7 if seed is not None else None
 
         # convert
-        pos_lh5 = convert_output(pos_ak, mode="pos", lunit=lunit)
+        pos_lh5 = convert_output_pos(pos_ak, lunit=lunit)
 
         msg = f"Output {pos_lh5}"
         log.debug(msg)
