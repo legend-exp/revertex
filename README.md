@@ -1,6 +1,7 @@
 # revertex
 
 [![PyPI](https://img.shields.io/pypi/v/revertex?logo=pypi)](https://pypi.org/project/revertex/)
+[![conda-forge](https://img.shields.io/conda/vn/conda-forge/revertex.svg)](https://anaconda.org/conda-forge/revertex)
 ![GitHub tag (latest by date)](https://img.shields.io/github/v/tag/legend-exp/revertex?logo=git)
 [![GitHub Workflow Status](https://img.shields.io/github/checks-status/legend-exp/revertex/main?label=main%20branch&logo=github)](https://github.com/legend-exp/revertex/actions)
 [![pre-commit](https://img.shields.io/badge/pre--commit-enabled-brightgreen?logo=pre-commit&logoColor=white)](https://github.com/pre-commit/pre-commit)
