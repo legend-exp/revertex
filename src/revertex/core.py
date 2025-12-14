@@ -156,7 +156,8 @@ def convert_output_pos(
 
     for field in ["xloc", "yloc", "zloc"]:
         assert arr[field].ndim == 1
-        out.add_field(field, Array(arr[field].to_numpy(), attrs={"units": lunit}))
+        col = arr[field].to_numpy().astype(np.float64, copy=False)
+        out.add_field(field, Array(col, attrs={"units": lunit}))
 
     return out
 
@@ -196,13 +197,15 @@ def convert_output_kin(
         unit = tunit if field == "time" else ""
         col = ak.flatten(arr[field]) if arr[field].ndim > 1 else arr[field]
         assert col.ndim == 1
-        out.add_field(field, Array(col.to_numpy(), attrs={"units": unit}))
+        col = col.to_numpy().astype(np.float64, copy=False)
+        out.add_field(field, Array(col, attrs={"units": unit}))
 
     for field in ["g4_pid"]:
         assert arr[field].ndim in (1, 2)
         col = ak.flatten(arr[field]) if arr[field].ndim > 1 else arr[field]
         assert col.ndim == 1
-        out.add_field(field, Array(col.to_numpy().astype(np.int64), dtype=np.int64))
+        col = col.to_numpy().astype(np.int64, copy=False)
+        out.add_field(field, Array(col, dtype=np.int64))
 
     # derive the number of particles in each event.
     n_part = np.zeros(lens[0], dtype=np.int64)
