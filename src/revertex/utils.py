@@ -77,7 +77,7 @@ def _get_position(name: str, reg: geant4.Registry) -> list:
     local_pos = pv.position
 
     n_mothers = 1
-    
+
     while n_mothers > 0:
         mothers = find_mother_physical_volume(pv, reg)
         n_mothers = len(mothers)
