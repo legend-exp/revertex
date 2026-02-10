@@ -9,6 +9,7 @@ import pyg4ometry.geant4 as pg4
 import pygeomhpges
 import pygeomtools
 from pyg4ometry import geant4
+
 from revertex import core
 
 log = logging.getLogger(__name__)
