@@ -91,7 +91,7 @@ def _get_position(name: str, reg: geant4.Registry) -> list:
                 raise RuntimeError(msg)
 
             local_pos += mothers[0].position
-            
+
             pv = mothers[0]
 
     return local_pos.eval()
@@ -112,7 +112,7 @@ def get_hpges(
         for name in det_list
     }
 
-    pos = {name: _get_position(name,reg) for name in det_list}
+    pos = {name: _get_position(name, reg) for name in det_list}
 
     return hpges, pos
 
