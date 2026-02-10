@@ -70,10 +70,10 @@ def find_mother_physical_volume(
     return mothers
 
 
-def _get_position(name: str, reg: geant4.Registry) -> list:
-    """Get the position from the GDML"""
+def _get_position(pv_name: str, reg: geant4.Registry) -> list:
+    """Get the global position of a physical volume from the GDML"""
 
-    pv = reg.physicalVolumeDict[name]
+    pv = reg.physicalVolumeDict[pv_name]
     local_pos = pv.position
 
     n_mothers = 1
