@@ -8,6 +8,7 @@ import numpy as np
 import pyg4ometry.geant4 as pg4
 import pygeomhpges
 import pygeomtools
+from pyg4ometry import geant4
 
 from revertex import core
 
@@ -54,6 +55,48 @@ def read_input_beta_csv(path: str, **kwargs) -> tuple[np.ndarray, np.ndarray]:
     return np.genfromtxt(path, **kwargs).T[0], np.genfromtxt(path, **kwargs).T[1]
 
 
+def find_mother_physical_volume(
+    pv: geant4.PhysicalVolume, registry: geant4.Registry
+) -> list:
+    """Find the mother physical volume."""
+    mothers = []
+
+    for other_pv in registry.physicalVolumeDict.values():
+        lv = other_pv.logicalVolume
+
+        if pv in lv.daughterVolumes:
+            mothers.append(other_pv)
+
+    return mothers
+
+
+def _get_position(pv_name: str, reg: geant4.Registry) -> list:
+    """Get the global position of a physical volume from the GDML"""
+
+    pv = reg.physicalVolumeDict[pv_name]
+    local_pos = pv.position
+
+    n_mothers = 1
+
+    while n_mothers > 0:
+        mothers = find_mother_physical_volume(pv, reg)
+        n_mothers = len(mothers)
+
+        if len(mothers) > 1:
+            msg = "Only support finding global position if every volume is only placed once."
+            raise RuntimeError(msg)
+        if len(mothers) == 1:
+            if mothers[0].rotation.eval() != [0, 0, 0]:
+                msg = "Only support finding global position without rotations"
+                raise RuntimeError(msg)
+
+            local_pos += mothers[0].position
+
+            pv = mothers[0]
+
+    return local_pos.eval()
+
+
 def get_hpges(
     reg: pg4.geant4.registry, detectors: str | list[str]
 ) -> tuple[dict, dict]:
@@ -69,7 +112,7 @@ def get_hpges(
         for name in det_list
     }
 
-    pos = {name: phy_vol_dict[name].position.eval() for name in det_list}
+    pos = {name: _get_position(name, reg) for name in det_list}
 
     return hpges, pos
 
