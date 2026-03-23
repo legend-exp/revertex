@@ -151,3 +151,160 @@ def setup_log(level: int | None = None) -> None:
 
     if level is not None:
         logger.setLevel(level)
+
+
+def collect_isotopes(
+    component,
+    scale: float,
+    isotopes: dict[int, float],
+    nist_registry,
+    nist_element_z_to_name: dict[int, str],
+    pyg4,
+    *,
+    normalize_output: bool = True,
+    _is_recursive_call: bool = False,
+) -> None:
+    """Recursively collect isotopes and their mass fractions for a given material component.
+
+    This function handles components defined as isotopes, elements, or compounds in pyg4ometry.
+    For isotopes, it directly adds the ZAID and mass fraction to the `isotopes` dictionary (used as pid in SaG4n).
+    For elements, it looks up the natural isotope abundances using the NIST registry.
+    For compounds, it recursively processes the sub-components.
+    """
+
+    def _to_float(value) -> float:
+        if hasattr(value, "eval"):
+            return float(value.eval())
+        return float(value)
+
+    def _component_mass_weight(
+        component,
+        comp_value,
+        comp_kind: str,
+        nist_registry,
+        nist_element_z_to_name: dict[int, str],
+        pyg4,
+    ) -> float:
+        value = _to_float(comp_value)
+        kind = comp_kind.lower()
+
+        if kind == "massfraction":
+            return value
+        if kind in {"abundance", "natoms"}:
+            return value * _component_reference_mass(
+                component,
+                nist_registry,
+                nist_element_z_to_name,
+                pyg4,
+            )
+        msg = f"Unsupported material component definition kind '{comp_kind}'."
+        raise ValueError(msg)
+
+    def _component_reference_mass(
+        component,
+        nist_registry,
+        nist_element_z_to_name: dict[int, str],
+        pyg4,
+    ) -> float:
+        if component.__class__.__name__ == "Isotope":
+            if hasattr(component, "a"):
+                return _to_float(component.a)
+            return _to_float(component.N)
+
+        sub_components = getattr(component, "components", None)
+        if not sub_components and hasattr(component, "Z"):
+            z = round(_to_float(component.Z))
+            nist_name = nist_element_z_to_name.get(z)
+            if nist_name is None:
+                msg = f"Cannot resolve natural isotope abundances for Z={z}."
+                raise ValueError(msg)
+            nist_element = pyg4.geant4.nist_element_2geant4Element(
+                nist_name, nist_registry
+            )
+            sub_components = nist_element.components
+
+        if not sub_components:
+            msg = f"Cannot infer reference mass for component '{getattr(component, 'name', component)}'."
+            raise ValueError(msg)
+
+        if any(
+            str(comp_kind).lower() == "massfraction"
+            for _, _, comp_kind in sub_components
+        ):
+            msg = f"Cannot infer reference mass for component '{getattr(component, 'name', component)}' because it is defined by mass fractions."
+            raise ValueError(msg)
+
+        # For abundance/natoms this is the sum over atomic masses weighted by atom counts/fractions.
+        return float(
+            np.sum(
+                [
+                    _to_float(comp_value)
+                    * _component_reference_mass(
+                        sub_component,
+                        nist_registry,
+                        nist_element_z_to_name,
+                        pyg4,
+                    )
+                    for sub_component, comp_value, _comp_kind in sub_components
+                ]
+            )
+        )
+
+    if component.__class__.__name__ == "Isotope":
+        z = round(_to_float(component.Z))
+        a = round(_to_float(component.N))
+        zaid = z * 1000 + a
+        isotopes[zaid] = isotopes.get(zaid, 0.0) + scale
+        return
+
+    sub_components = getattr(component, "components", None)
+    if not sub_components and hasattr(component, "Z"):
+        z = round(_to_float(component.Z))
+        nist_name = nist_element_z_to_name.get(z)
+        if nist_name is None:
+            msg = f"Cannot resolve natural isotope abundances for Z={z}."
+            raise ValueError(msg)
+        nist_element = pyg4.geant4.nist_element_2geant4Element(nist_name, nist_registry)
+        sub_components = nist_element.components
+
+    if not sub_components:
+        msg = f"Cannot expand material component '{getattr(component, 'name', component)}' into isotopes."
+        raise ValueError(msg)
+
+    comp_values = [
+        _component_mass_weight(
+            sub_component,
+            comp_value,
+            comp_kind,
+            nist_registry,
+            nist_element_z_to_name,
+            pyg4,
+        )
+        for sub_component, comp_value, comp_kind in sub_components
+    ]
+    total = float(np.sum(comp_values))
+    if total <= 0:
+        msg = "Material component fractions are not valid."
+        raise ValueError(msg)
+
+    for (sub_component, _comp_value, _comp_kind), weighted_value in zip(
+        sub_components, comp_values, strict=True
+    ):
+        collect_isotopes(
+            sub_component,
+            scale * weighted_value / total,
+            isotopes,
+            nist_registry,
+            nist_element_z_to_name,
+            pyg4,
+            normalize_output=normalize_output,
+            _is_recursive_call=True,
+        )
+
+    if normalize_output and not _is_recursive_call:
+        total_mass = float(np.sum(list(isotopes.values())))
+        if total_mass <= 0:
+            msg = "Material component fractions are not valid."
+            raise ValueError(msg)
+        for zaid in list(isotopes.keys()):
+            isotopes[zaid] = isotopes[zaid] / total_mass
