@@ -139,7 +139,7 @@ ENDSOURCE
 """,
 }
 
-alphas_per_decay = {"Th232": 6, "U238_lower": 4, "U238_upper": 4}
+ALPHAS_PER_DECAY = {"Th232": 6, "U238_lower": 4, "U238_upper": 4}
 
 
 def _detect_container_runtime(input_data: dict) -> str:
@@ -181,7 +181,7 @@ def calculate_integral_yield(
 ) -> float:
     """Helper function to calculate the integral neutron yield per emitted alpha."""
     mask = particle == "neutron"
-    return np.sum(weights[mask]) / n_events * alphas_per_decay.get(decay_chain, 1)
+    return np.sum(weights[mask]) / n_events * ALPHAS_PER_DECAY.get(decay_chain, 1)
 
 
 def read_sag4n_output(input_data: dict) -> dict:
@@ -252,14 +252,14 @@ def prepare_sag4n_output_for_lh5(ak_array: ak.Array) -> ak.Array:
 
 
 def save_sag4n_output_to_lh5(
-    ak_array: ak.Array,
-    integral_yield: float,
-    n_valid_events: int,
+    output_data: dict,
     output_file: str | Path,
     eunit: str = "keV",
     tunit: str = "ns",
 ) -> None:
     """Helper function to save the SaG4n generated events and integral yield to lh5 file."""
+
+    ak_array = output_data["prepared_output"]
 
     kin_lh5 = Table(size=len(ak_array))
 
@@ -275,14 +275,17 @@ def save_sag4n_output_to_lh5(
         kin_lh5.add_field(field, Array(col, dtype=np.int64))
 
     lh5.write(kin_lh5, "vtx/kin", output_file, wo_mode="of")
+
+    misc_data = {
+        "integral_yield": types.Scalar(output_data["integral_yield"]),
+        "n_valid_events": types.Scalar(output_data["n_valid_events"]),
+        "n_simulated_events": types.Scalar(output_data["n_simulated_events"]),
+    }
+    misc = types.Struct(misc_data)
+
     lh5.write(
-        types.Scalar(integral_yield),
-        "misc/integral_yield",
-        output_file,
-        wo_mode="append",
-    )
-    lh5.write(types.Scalar(n_valid_events),
-        "misc/n_valid_events",
+        misc,
+        "misc",
         output_file,
         wo_mode="append",
     )
@@ -620,14 +623,20 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
     msg = f"Integral yield: {integral_yield:.3e} (n/alpha)"
     log.info(msg)
 
-    n_valid_events = np.sum(evt_data["n_part"] > 0)
-    log.info(f"Number of valid events with n_part > 0: {n_valid_events}")
+    prepared_output = prepare_sag4n_output_for_lh5(evt_data)
+
+    n_valid_events = np.sum(prepared_output["n_part"] > 0)
+    msg = f"Number of valid events with n_part > 0: {n_valid_events}"
+    log.info(msg)
+
+    output_data = {
+        "prepared_output": prepared_output,
+        "integral_yield": integral_yield,
+        "n_valid_events": n_valid_events,
+        "n_simulated_events": input_data.get("n_events", 10000000),
+    }
 
     save_sag4n_output_to_lh5(
-        prepare_sag4n_output_for_lh5(evt_data),
-        integral_yield,
-        n_valid_events,
+        output_data,
         input_data["output_file"]
     )
-
-    return n_valid_events
