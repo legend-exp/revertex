@@ -165,7 +165,6 @@ def test_detect_container_runtime_uses_shifter_when_docker_missing(monkeypatch):
     assert alpha_n._detect_container_runtime({}) == "shifter"
 
 
-
 def test_detect_container_runtime_requested_runtime_missing(monkeypatch):
     monkeypatch.setattr(alpha_n.shutil, "which", lambda _cmd: None)
 
@@ -178,9 +177,6 @@ def test_detect_container_runtime_raises_when_no_runtime_available(monkeypatch):
 
     with pytest.raises(RuntimeError, match="No supported container runtime found"):
         alpha_n._detect_container_runtime({})
-
-
-
 
 
 def test_calculate_integral_yield_scales_with_alphas_per_decay():

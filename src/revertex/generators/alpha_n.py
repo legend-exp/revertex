@@ -173,9 +173,6 @@ def _detect_container_runtime(input_data: dict) -> str:
     raise RuntimeError(msg)
 
 
-
-
-
 def calculate_integral_yield(
     weights: np.ndarray, particle: np.ndarray, n_events: int, decay_chain: str
 ) -> float:
@@ -337,7 +334,7 @@ def generate_material_input(gdml_file: str | Path, part: str) -> str:
 
 def generate_sag4n_input_file(input_data: dict) -> str:
     """Helper function to generate valid SaG4n input files.
-    
+
     Assumes input_data already has required fields: sub_material, source_chain, output_file_sag4n.
     Validation is the caller's responsibility.
     """
@@ -369,8 +366,9 @@ def run_sag4n(input_data: dict) -> None:
     # For Shifter, explicitly use /tmp which is guaranteed to be accessible
     tmpdir_arg = "/tmp" if runtime == "shifter" else None
 
-    with tempfile.TemporaryDirectory(prefix=".revertex_sag4n_", dir=tmpdir_arg) as tmpdir:
-
+    with tempfile.TemporaryDirectory(
+        prefix=".revertex_sag4n_", dir=tmpdir_arg
+    ) as tmpdir:
         input_path = Path(tmpdir) / "input.txt"
 
         input_path.write_text(
@@ -505,7 +503,7 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
         raise ValueError(msg)
 
     input_data["container_runtime"] = _detect_container_runtime(input_data)
-    
+
     # Validate container image availability
     runtime = input_data["container_runtime"]
     image = input_data["container_image"]
@@ -636,7 +634,4 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
         "n_simulated_events": input_data.get("n_events", 10000000),
     }
 
-    save_sag4n_output_to_lh5(
-        output_data,
-        input_data["output_file"]
-    )
+    save_sag4n_output_to_lh5(output_data, input_data["output_file"])
