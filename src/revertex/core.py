@@ -78,16 +78,17 @@ def convert_output_kin(
 
     def _flatten_col(arr: ak.Array, field: str, dtype) -> ArrayLike:
         assert arr[field].ndim in (1, 2)
+        attrs = {}
+        if field == "ekin":
+            attrs["units"] = eunit
+        elif field == "time":
+            attrs["units"] = tunit
+
         col = ak.flatten(arr[field]) if arr[field].ndim > 1 else arr[field]
         assert col.ndim == 1
-        return col.to_numpy().astype(dtype, copy=False)
-
-    for field in ["px", "py", "pz", "ekin", "time"]:
-        col = _flatten_col(arr, field, np.float64)
-        unit = eunit if field == "ekin" else ""
-        unit = tunit if field == "time" else ""
-        out.add_field(field, Array(col, attrs={"units": unit}))
-
+        col = col.to_numpy().astype(np.float64, copy=False)
+        out.add_field(field, Array(col, attrs=attrs))
+        
     for field in ["g4_pid"]:
         col = _flatten_col(arr, field, np.int64)
         out.add_field(field, Array(col, dtype=np.int64))

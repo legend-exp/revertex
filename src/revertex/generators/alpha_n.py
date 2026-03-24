@@ -9,15 +9,14 @@ from pathlib import Path
 import awkward as ak
 import numpy as np
 import pyg4ometry as pyg4
-from lgdo import lh5, types
+from lgdo import Array, Table, lh5, types
 
-from revertex.core import convert_output_kin
 from revertex.utils import collect_isotopes
 
 log = logging.getLogger(__name__)
 
 
-sag4n_input_template = """
+SAG4N_INPUT_TEMPLATE = """
 ################################################################################
 ###                               GEOMETRY                                   ###
 ################################################################################
@@ -68,13 +67,13 @@ SEED {sub_seed} #OPTIONAL
 END
 """
 
-sag4n_material_template = """
+SAG4N_MATERIAL_TEMPLATE = """
 MATERIAL 1 {sub_name} {sub_density} {sub_n_isotopes}
 {sub_isotopes}
 ENDMATERIAL
 """
 
-sag4n_sources = {
+SAG4N_SOURCES = {
     "Th232": """
 SOURCE 1 0 0 0 0
 1.00 1
@@ -140,15 +139,46 @@ ENDSOURCE
 """,
 }
 
-alphas_per_decay = {"Th232": 6, "U238_lower": 4, "U238_upper": 4}
+ALPHAS_PER_DECAY = {"Th232": 6, "U238_lower": 4, "U238_upper": 4}
+
+
+def _detect_container_runtime(input_data: dict) -> str:
+    """Select container runtime, preferring docker and falling back to shifter."""
+    requested_runtime = input_data.get("container_runtime")
+    if requested_runtime is not None:
+        runtime = str(requested_runtime).strip().lower()
+        if runtime not in {"docker", "shifter"}:
+            msg = (
+                "Unsupported container runtime "
+                f"'{requested_runtime}'. Supported runtimes are 'docker' and 'shifter'."
+            )
+            raise ValueError(msg)
+        if shutil.which(runtime) is None:
+            msg = (
+                f"Requested container runtime '{runtime}' was not found in PATH. "
+                "Please install it or choose a different runtime."
+            )
+            raise RuntimeError(msg)
+        return runtime
+
+    if shutil.which("docker") is not None:
+        return "docker"
+    if shutil.which("shifter") is not None:
+        return "shifter"
+
+    msg = (
+        "No supported container runtime found. Install Docker or Shifter and "
+        "ensure the executable is available in PATH."
+    )
+    raise RuntimeError(msg)
 
 
 def calculate_integral_yield(
     weights: np.ndarray, particle: np.ndarray, n_events: int, decay_chain: str
 ) -> float:
-    """Helper function to calculate the integral neutron yield per emitted alpha."""
+    """Helper function to calculate the integral neutron yield per decay of the source-chain initial isotope."""
     mask = particle == "neutron"
-    return np.sum(weights[mask]) / n_events * alphas_per_decay.get(decay_chain, 1)
+    return np.sum(weights[mask]) / n_events * ALPHAS_PER_DECAY.get(decay_chain, 1)
 
 
 def read_sag4n_output(input_data: dict) -> dict:
@@ -195,11 +225,12 @@ def prepare_sag4n_output_for_lh5(ak_array: ak.Array) -> ak.Array:
                 "n_part": np.array([], dtype=float),
             }
         )
-
+    _, idx, counts = np.unique(ak_array["evtid"], return_counts=True, return_index=True)
     n_part = np.zeros(len(ak_array["evtid"]))
+    n_part[idx] = counts
     time = np.zeros(len(ak_array["evtid"]))
     g4_pid = np.zeros(len(ak_array["evtid"]), dtype=int)
-    particles = {"neutron": 2112, "photon": 22}
+    particles = {"neutron": 2112, "gamma": 22}
     for part, value in particles.items():
         mask = ak_array["particle"] == part
         g4_pid[mask] = value
@@ -218,17 +249,44 @@ def prepare_sag4n_output_for_lh5(ak_array: ak.Array) -> ak.Array:
 
 
 def save_sag4n_output_to_lh5(
-    ak_array: ak.Array,
-    integral_yield: float,
+    output_data: dict,
     output_file: str | Path,
-    eunit: str = "keV",
+    eunit: str = "MeV",
+    tunit: str = "ns",
 ) -> None:
     """Helper function to save the SaG4n generated events and integral yield to lh5 file."""
-    kin_lh5 = convert_output_kin(ak_array, eunit=eunit)
+
+    ak_array = output_data["prepared_output"]
+
+    kin_lh5 = Table(size=len(ak_array))
+
+    for field in ["px", "py", "pz", "ekin", "time"]:
+        assert ak_array[field].ndim in (1, 2)
+        attrs = {}
+        if field == "ekin":
+            attrs["units"] = eunit
+        elif field == "time":
+            attrs["units"] = tunit
+
+        col = ak_array[field].to_numpy().astype(np.float64, copy=False)
+        kin_lh5.add_field(field, Array(col, attrs=attrs))
+
+    for field in ["g4_pid", "n_part"]:
+        col = ak_array[field].to_numpy().astype(np.int64, copy=False)
+        kin_lh5.add_field(field, Array(col, dtype=np.int64))
+
     lh5.write(kin_lh5, "vtx/kin", output_file, wo_mode="of")
+
+    misc_data = {
+        "integral_yield": types.Scalar(output_data["integral_yield"]),
+        "n_valid_events": types.Scalar(output_data["n_valid_events"]),
+        "n_simulated_events": types.Scalar(output_data["n_simulated_events"]),
+    }
+    misc = types.Struct(misc_data)
+
     lh5.write(
-        types.Scalar(integral_yield),
-        "misc/integral_yield",
+        misc,
+        "misc",
         output_file,
         wo_mode="append",
     )
@@ -249,31 +307,28 @@ def generate_material_input(gdml_file: str | Path, part: str) -> str:
         msg = f"Logical volume '{part}' has no material attached."
         raise ValueError(msg)
 
-    nist_registry = pyg4.geant4.Registry()
     nist_element_z_to_name = pyg4.geant4.getNistElementZToName()
     if getattr(material, "type", None) == "nist":
-        material = pyg4.geant4.nist_material_2geant4Material(
-            material.name, nist_registry
-        )
+        material = pyg4.geant4.nist_material_2geant4Material(material.name, reg)
 
     isotopes: dict[int, float] = {}
     collect_isotopes(
         material,
         1.0,
         isotopes,
-        nist_registry,
+        reg,
         nist_element_z_to_name,
         pyg4,
     )
 
-    total_mass_fraction = float(np.sum(list(isotopes.values())))
+    total_atomic_fraction = float(np.sum(list(isotopes.values())))
     isotope_lines = []
-    for zaid, mass_fraction in sorted(isotopes.items()):
+    for zaid, atomic_fraction in sorted(isotopes.items()):
         isotope_lines.append(
-            f"{zaid} -{mass_fraction / total_mass_fraction:.12g}"
-        )  # negative sign for mass fraction in sag4n
+            f"{zaid} {atomic_fraction / total_atomic_fraction:.12g}"
+        )  # atomic fraction when specifying isotopes in sag4n
 
-    return sag4n_material_template.format(
+    return SAG4N_MATERIAL_TEMPLATE.format(
         sub_name=material.name,
         sub_density=f"{float(material.density):.12g}",
         sub_n_isotopes=len(isotope_lines),
@@ -282,20 +337,16 @@ def generate_material_input(gdml_file: str | Path, part: str) -> str:
 
 
 def generate_sag4n_input_file(input_data: dict) -> str:
-    """Helper function to generate valid SaG4n input files."""
+    """Helper function to generate valid SaG4n input files.
 
-    if "sub_material" not in input_data:
-        if "gdml_file" not in input_data or "part" not in input_data:
-            msg = "Either 'sub_material' or both 'gdml_file' and 'part' must be provided in input_data."
-            raise ValueError(msg)
-        input_data["sub_material"] = generate_material_input(
-            input_data["gdml_file"], input_data["part"]
-        )
+    Assumes input_data already has required fields: sub_material, source_chain, output_file_sag4n.
+    Validation is the caller's responsibility.
+    """
     output_stem = input_data["output_file_sag4n"].stem
 
-    compiled_input = sag4n_input_template.format(
+    compiled_input = SAG4N_INPUT_TEMPLATE.format(
         sub_material=input_data["sub_material"],
-        sub_source_chain=sag4n_sources[input_data["source_chain"]],
+        sub_source_chain=SAG4N_SOURCES[input_data["source_chain"]],
         sub_n_events=input_data.get("n_events", 10000000),
         sub_output_file=output_stem,
         sub_seed=input_data.get("seed", input_data.get("sub_seed", 1234567)),
@@ -312,71 +363,111 @@ def generate_sag4n_input_file(input_data: dict) -> str:
 
 def run_sag4n(input_data: dict) -> None:
     """Wrapper for SaG4n."""
+    
+    runtime = input_data["container_runtime"]
+    image = input_data["container_image"]
+    output_stem = input_data["sag4n_output_stem"]
+
+    # For Shifter, explicitly use /tmp which is guaranteed to be accessible
+    tmpdir_arg = "/tmp" if runtime == "shifter" else None
+
     with tempfile.TemporaryDirectory(
-        prefix=".revertex_sag4n_", dir=str(Path.cwd())
+        prefix=".revertex_sag4n_", dir=tmpdir_arg
     ) as tmpdir:
         input_path = Path(tmpdir) / "input.txt"
-        output_stem = input_data["output_file_sag4n"].stem
-
-        #        Path(tmpdir).chmod(0o777)
 
         input_path.write_text(
             Path(input_data["input_file_sag4n"]).read_text(encoding="utf-8"),
             encoding="utf-8",
         )
-        #        Path(input_path).chmod(0o644)
 
-        cmd = [
-            "docker",
-            "run",
-            "--rm",
-            "-v",
-            f"{tmpdir}:/data",
-            "-w",
-            "/data",
-            input_data["docker_image"],
-            "input.txt",
-        ]
+        # Build runtime-specific container command
+        runtime = input_data["container_runtime"]
+        image = input_data["container_image"]
+        if runtime == "docker":
+            cmd = [
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                f"{tmpdir}:/data",
+                "-w",
+                "/data",
+                image,
+                "input.txt",
+            ]
+        elif runtime == "shifter":
+            shifter_image = image
+            if ":" not in shifter_image.split("/")[0]:
+                shifter_image = f"docker:{shifter_image}"
+            cmd = [
+                "shifter",
+                f"--image={shifter_image}",
+                f"--volume={tmpdir}:/data",
+                "--workdir=/data",
+                "sag4n-entrypoint",
+                "input.txt",
+            ]
+        else:
+            msg = f"Unsupported container runtime '{runtime}'."
+            raise ValueError(msg)
 
         try:
-            proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            with subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            ) as proc:
+                output_lines = []
+                if proc.stdout is not None:
+                    for line in proc.stdout:
+                        log.info(line)
+                        output_lines.append(line)
+                proc.wait()
+
+            stdout_text = "".join(output_lines)
             (Path(tmpdir) / f"{output_stem}.log").write_text(
-                (
-                    (proc.stdout or "")
-                    + ("\n" if proc.stdout and proc.stderr else "")
-                    + (proc.stderr or "")
-                ),
-                encoding="utf-8",
+                stdout_text, encoding="utf-8"
             )
+
+            if proc.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    proc.returncode, cmd, output=stdout_text
+                )
         except FileNotFoundError as exc:
-            msg = "Docker executable not found. Please install Docker and ensure 'docker' is in PATH."
+            msg = (
+                f"Container runtime executable '{runtime}' not found. "
+                "Please install it and ensure it is in PATH."
+            )
             raise RuntimeError(msg) from exc
         except subprocess.CalledProcessError as exc:
-            stderr = (exc.stderr or "").strip()
-            stdout = (exc.stdout or "").strip()
-            details = stderr or stdout or str(exc)
-            (Path(tmpdir) / f"{output_stem}.log").write_text(
-                (
-                    (exc.stdout or "")
-                    + ("\n" if exc.stdout and exc.stderr else "")
-                    + (exc.stderr or "")
-                ),
-                encoding="utf-8",
-            )
+            details = (exc.output or exc.stdout or "").strip() or str(exc)
             if (
                 "permission denied" in details.lower()
                 and "docker daemon socket" in details.lower()
             ):
                 msg = "Cannot access Docker daemon socket. Ensure your user has permission to run Docker (e.g. join the 'docker' group or use rootless Docker), then retry."
                 raise RuntimeError(msg) from exc
-            if "/data/input.txt" in details and "permission denied" in details.lower():
-                msg = "Docker could not read /data/input.txt inside the container. This is usually caused by host filesystem permission restrictions on the bind mount."
+            if runtime == "shifter" and (
+                "bind mount failed" in details.lower()
+                or "failed to setup user-requested mounts" in details.lower()
+                or "unclean exit from bind-mount routine" in details.lower()
+            ):
+                msg = (
+                    "Shifter failed to bind-mount the temporary working directory. "
+                    "Set TMPDIR environment variable to a Shifter-accessible path "
+                    "(e.g., TMPDIR=/tmp or TMPDIR=$SCRATCH) and retry."
+                )
                 raise RuntimeError(msg) from exc
-            msg = f"SaG4n Docker execution failed: {details}"
+            if "/data/input.txt" in details and "permission denied" in details.lower():
+                msg = f"{runtime.capitalize()} could not read /data/input.txt inside the container. This is usually caused by host filesystem permission restrictions on the bind mount."
+                raise RuntimeError(msg) from exc
+            # Display generated input file content for debugging
+            input_file_content = input_path.read_text(encoding="utf-8")
+            msg = f"SaG4n execution failed with {runtime}: {details}\n\nGenerated input file:\n{input_file_content}"
             raise RuntimeError(msg) from exc
-
-        log.info("SaG4n output:")
-        log.info(proc.stdout)
 
         input_data["output_file_sag4n"].parent.mkdir(parents=True, exist_ok=True)
 
@@ -412,7 +503,8 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
     Additional optional input is:
     - `n_events`: Number of events to simulate in SaG4n. Default is 10 million.
     - `seed`: Random seed for the SaG4n simulation. Default is 1234567.
-    - `docker_image`: Name of the Docker image to use for running SaG4n. Default is 'moritzneuberger/sag4n-for-revertex:latest'.
+    - `container_runtime`: Container runtime to use (`docker` or `shifter`). If omitted, the script auto-detects (`docker` first, then `shifter`).
+    - `container_image`: Name of the container image used to run SaG4n. Default is 'moritzneuberger/sag4n-for-revertex:latest'.
     - `output_file_sag4n`: Folder and stem path of SaG4n output files (.out, .root, .log). These are usually temporary files deleted after processing.
     """
 
@@ -420,24 +512,57 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
         msg = "'output_file' must be provided in input_data."
         raise ValueError(msg)
 
-    if "docker_image" not in input_data:
-        input_data["docker_image"] = "moritzneuberger/sag4n-for-revertex:latest"
+    input_data["container_runtime"] = _detect_container_runtime(input_data)
 
-    is_docker_available = shutil.which("docker") is not None
-    if not is_docker_available:
-        msg = "Docker is required to run SaG4n but was not found. Please install Docker and ensure 'docker' is in PATH."
-        raise RuntimeError(msg)
+    # Validate container image availability
+    runtime = input_data["container_runtime"]
+    image = input_data["container_image"]
+    if runtime == "docker":
+        try:
+            subprocess.run(
+                ["docker", "image", "inspect", image],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError:
+            msg = f"Docker image '{image}' not found. Please pull it with 'docker pull {image}'."
+            raise RuntimeError(msg) from None
+    elif runtime == "shifter":
+        try:
+            proc = subprocess.run(
+                ["shifterimg", "images"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            details = (exc.stderr or exc.stdout or str(exc)).strip()
+            msg = f"Failed to query Shifter images via 'shifterimg images': {details}"
+            raise RuntimeError(msg) from exc
 
-    try:
-        subprocess.run(
-            ["docker", "image", "inspect", input_data["docker_image"]],
-            check=True,
-            capture_output=True,
-            text=True,
-        )
-    except subprocess.CalledProcessError:
-        msg = f"Docker image '{input_data['docker_image']}' not found. Please pull it with 'docker pull {input_data['docker_image']}'."
-        raise RuntimeError(msg) from None
+        candidates = {image}
+        if image.startswith("docker:"):
+            candidates.add(image.split("docker:", 1)[1])
+        else:
+            candidates.add(f"docker:{image}")
+
+        available = False
+        for line in proc.stdout.splitlines():
+            tokens = line.split()
+            if not tokens:
+                continue
+            if any(token in candidates for token in tokens):
+                available = True
+                break
+
+        if not available:
+            image_hint = image if image.startswith("docker:") else f"docker:{image}"
+            msg = (
+                f"Shifter image '{image}' is not available. "
+                f"Pull it first with 'shifterimg -v pull {image_hint}' and wait until status is READY."
+            )
+            raise RuntimeError(msg)
 
     if "output_file_sag4n" in input_data:
         input_data["output_file_sag4n"] = Path(input_data["output_file_sag4n"])
@@ -446,6 +571,7 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
         output_file = tmp_file.name
         tmp_file.close()
         input_data["output_file_sag4n"] = Path(output_file)
+    input_data["sag4n_output_stem"] = input_data["output_file_sag4n"].stem
 
     if "input_file_sag4n" not in input_data:
         if "sub_material" not in input_data:
@@ -459,24 +585,63 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
         if "source_chain" not in input_data:
             msg = (
                 "'source_chain' must be provided in input_data.\n Available chains: "
-                + ", ".join(sag4n_sources.keys())
+                + ", ".join(SAG4N_SOURCES.keys())
             )
             raise ValueError(msg)
 
         input_file = generate_sag4n_input_file(input_data)
-        input_data["input_file_sag4n"] = input_file
-    input_data["input_file_sag4n"] = Path(input_data["input_file_sag4n"])
+        input_data["input_file_sag4n"] = Path(input_file)
+    else:
+        # Extract the OUTPUTFILE stem from the input file early for validation
+        input_text = Path(input_data["input_file_sag4n"]).read_text(encoding="utf-8")
+        output_stem = None
+        for line in input_text.split("\n"):
+            line_strip = line.strip()
+            if line_strip.startswith("OUTPUTFILE"):
+                # Extract filename from "OUTPUTFILE /data/filename" or "OUTPUTFILE filename"
+                parts = line_strip.split()
+                if len(parts) >= 2:
+                    filepath = parts[1]
+                    output_stem = Path(filepath).name
+                    break
+        if output_stem is None:
+            output_stem = input_data["output_file_sag4n"].stem
+
+        source_chain_in_file = None
+        for chain_name, chain_def in SAG4N_SOURCES.items():
+            if chain_def.strip() in input_text:
+                source_chain_in_file = chain_name
+                break
+        if source_chain_in_file is None:
+            msg = (
+                "Could not detect source chain in the provided input file. "
+                "Please ensure it contains one of the following source definitions:\n"
+                + "\n".join(f"- {name}" for name in SAG4N_SOURCES)
+            )
+            raise ValueError(msg)
+        input_data["source_chain"] = source_chain_in_file
+
+        input_data["sag4n_output_stem"] = output_stem
 
     run_sag4n(input_data)
     sag4n_output = read_sag4n_output(input_data)
 
     evt_data = sag4n_output["evts"]
     integral_yield = sag4n_output["integral_yield"]
-    msg = f"Integral yield: {integral_yield:.3e} (n/alpha)"
+    msg = f"Integral yield: {integral_yield:.3e} (n/decay)"
     log.info(msg)
 
-    save_sag4n_output_to_lh5(
-        prepare_sag4n_output_for_lh5(evt_data),
-        integral_yield,
-        input_data["output_file"],
-    )
+    prepared_output = prepare_sag4n_output_for_lh5(evt_data)
+
+    n_valid_events = np.sum(prepared_output["n_part"] > 0)
+    msg = f"Number of valid events with n_part > 0: {n_valid_events}"
+    log.info(msg)
+
+    output_data = {
+        "prepared_output": prepared_output,
+        "integral_yield": integral_yield,
+        "n_valid_events": n_valid_events,
+        "n_simulated_events": input_data.get("n_events", 10000000),
+    }
+
+    save_sag4n_output_to_lh5(output_data, input_data["output_file"])
