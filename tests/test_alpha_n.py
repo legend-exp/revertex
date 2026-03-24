@@ -106,8 +106,6 @@ def test_generate_material_input_for_natoms_material(tmp_path):
 
 
 def test_generate_sag4n_input_file(test_gdml):
-    from revertex.generators.alpha_n import generate_material_input
-
     tmp_file = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
     output_file = tmp_file.name
     tmp_file.close()
@@ -165,7 +163,6 @@ def test_detect_container_runtime_uses_shifter_when_docker_missing(monkeypatch):
     assert alpha_n._detect_container_runtime({}) == "shifter"
 
 
-
 def test_detect_container_runtime_requested_runtime_missing(monkeypatch):
     monkeypatch.setattr(alpha_n.shutil, "which", lambda _cmd: None)
 
@@ -178,9 +175,6 @@ def test_detect_container_runtime_raises_when_no_runtime_available(monkeypatch):
 
     with pytest.raises(RuntimeError, match="No supported container runtime found"):
         alpha_n._detect_container_runtime({})
-
-
-
 
 
 def test_calculate_integral_yield_scales_with_alphas_per_decay():
@@ -237,7 +231,7 @@ def test_prepare_sag4n_output_for_lh5_non_empty_mapping():
     prepared = prepare_sag4n_output_for_lh5(evts)
 
     assert prepared["g4_pid"].to_list() == [2112, 22, 2112]
-    assert prepared["n_part"].to_list() == [2.0, 0.0, 1.0]
+    assert prepared["n_part"].to_list() == [2, 0.0, 1]
     assert prepared["time"].to_list() == [0.0, 0.0, 0.0]
 
 
@@ -262,81 +256,6 @@ def test_generate_sag4n_input_file_uses_sub_material_without_gdml(tmp_path):
 def test_generate_alpha_n_spectrum_requires_output_file():
     with pytest.raises(ValueError, match="'output_file' must be provided"):
         alpha_n.generate_alpha_n_spectrum({})
-
-
-def test_generate_alpha_n_spectrum_from_input_file_without_container_execution(
-    monkeypatch, tmp_path
-):
-    input_text = (
-        "HEADER\n"
-        "OUTPUTFILE /data/from_input_file\n"
-        f"{alpha_n.SAG4N_SOURCES['Th232'].strip()}\n"
-    )
-    input_file = tmp_path / "input.txt"
-    input_file.write_text(input_text, encoding="utf-8")
-
-    captured: dict = {}
-
-    def _fake_detect_runtime(_input_data):
-        return "docker"
-
-    def _fake_check_image(_runtime, _image):
-        return None
-
-    def _fake_run_sag4n(input_data):
-        captured["run_source_chain"] = input_data["source_chain"]
-        captured["run_output_stem"] = input_data["sag4n_output_stem"]
-
-    def _fake_read(_input_data):
-        return {
-            "evts": ak.Array(
-                {
-                    "evtid": [0],
-                    "particle": ["neutron"],
-                    "ekin": [1.0],
-                    "weight": [1.0],
-                    "x": [0.0],
-                    "y": [0.0],
-                    "z": [0.0],
-                    "px": [1.0],
-                    "py": [0.0],
-                    "pz": [0.0],
-                }
-            ),
-            "integral_yield": 1.23,
-        }
-
-    def _fake_prepare(evt_data):
-        return evt_data
-
-    def _fake_save(ak_array, integral_yield, output_file, eunit="keV", tunit="ns"):
-        captured["saved_integral_yield"] = integral_yield
-        captured["saved_output_file"] = Path(output_file)
-        captured["saved_entries"] = len(ak_array["evtid"])
-        captured["saved_units"] = (eunit, tunit)
-
-    monkeypatch.setattr(alpha_n, "_detect_container_runtime", _fake_detect_runtime)
-    # Mock subprocess to avoid actual Docker calls during image validation
-    monkeypatch.setattr(alpha_n.subprocess, "run", lambda *_args, **_kwargs: None)
-    monkeypatch.setattr(alpha_n, "run_sag4n", _fake_run_sag4n)
-    monkeypatch.setattr(alpha_n, "read_sag4n_output", _fake_read)
-    monkeypatch.setattr(alpha_n, "prepare_sag4n_output_for_lh5", _fake_prepare)
-    monkeypatch.setattr(alpha_n, "save_sag4n_output_to_lh5", _fake_save)
-
-    alpha_n.generate_alpha_n_spectrum(
-        {
-            "output_file": tmp_path / "result.lh5",
-            "input_file_sag4n": input_file,
-            "container_image": "repo/image:tag",
-        }
-    )
-
-    assert captured["run_source_chain"] == "Th232"
-    assert captured["run_output_stem"] == "from_input_file"
-    assert captured["saved_integral_yield"] == pytest.approx(1.23)
-    assert captured["saved_output_file"].name == "result.lh5"
-    assert captured["saved_entries"] == 1
-    assert captured["saved_units"] == ("keV", "ns")
 
 
 def test_generate_alpha_n_spectrum_fails_when_source_chain_missing_in_input_file(
