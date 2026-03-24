@@ -75,13 +75,13 @@ ENDMATERIAL
 """
 
 sag4n_sources = {
-    "th232": """
+    "Th232": """
 SOURCE 1 0 0 0 0
 1.00 1
 Chain_Th232 0 100.0
 ENDSOURCE
 """,
-    "u238_lower": """
+    "U238_lower": """
 SOURCE 1 0 0 0 0
 1.00 24
 86222  5.48948  99.92
@@ -110,7 +110,7 @@ SOURCE 1 0 0 0 0
 84210  4.51658  0.001039998648
 ENDSOURCE
 """,
-    "u238_upper": """
+    "U238_upper": """
 SOURCE 1 0 0 0 0
 1.00 23
 92238  4.198  79.0
@@ -140,19 +140,19 @@ ENDSOURCE
 """,
 }
 
-alphas_per_decay = {"th232": 6, "u238_lower": 4, "u238_upper": 4}
+alphas_per_decay = {"Th232": 6, "U238_lower": 4, "U238_upper": 4}
 
 
 def calculate_integral_yield(
     weights: np.ndarray, particle: np.ndarray, n_events: int, decay_chain: str
 ) -> float:
-    """ Helper function to calculate the integral neutron yield per emitted alpha. """
+    """Helper function to calculate the integral neutron yield per emitted alpha."""
     mask = particle == "neutron"
     return np.sum(weights[mask]) / n_events * alphas_per_decay.get(decay_chain, 1)
 
 
 def read_sag4n_output(input_data: dict) -> dict:
-    """ Helper function to read the SaG4n output files. """
+    """Helper function to read the SaG4n output files."""
     fields = ["evtid", "particle", "ekin", "weight", "x", "y", "z", "px", "py", "pz"]
     output = {field: [] for field in fields}
     with Path(input_data.get("output_file_sag4n")).open() as f:
@@ -182,7 +182,7 @@ def read_sag4n_output(input_data: dict) -> dict:
 
 
 def prepare_sag4n_output_for_lh5(ak_array: ak.Array) -> ak.Array:
-    """ Helper function to format the SaG4n output to remage readable output. """
+    """Helper function to format the SaG4n output to remage readable output."""
     if len(ak_array["evtid"]) == 0:
         return ak.Array(
             {
@@ -223,7 +223,7 @@ def save_sag4n_output_to_lh5(
     output_file: str | Path,
     eunit: str = "keV",
 ) -> None:
-    """ Helper function to save the SaG4n generated events and integral yield to lh5 file.  """
+    """Helper function to save the SaG4n generated events and integral yield to lh5 file."""
     kin_lh5 = convert_output_kin(ak_array, eunit=eunit)
     lh5.write(kin_lh5, "vtx/kin", output_file, wo_mode="of")
     lh5.write(
@@ -235,7 +235,7 @@ def save_sag4n_output_to_lh5(
 
 
 def generate_material_input(gdml_file: str | Path, part: str) -> str:
-    """    Helper function to generate material definition for the input file.    """
+    """Helper function to generate material definition for the input file."""
 
     reg = pyg4.gdml.Reader(str(gdml_file)).getRegistry()
 
@@ -282,7 +282,7 @@ def generate_material_input(gdml_file: str | Path, part: str) -> str:
 
 
 def generate_sag4n_input_file(input_data: dict) -> str:
-    """ Helper function to generate valid SaG4n input files. """
+    """Helper function to generate valid SaG4n input files."""
 
     if "sub_material" not in input_data:
         if "gdml_file" not in input_data or "part" not in input_data:
@@ -291,8 +291,7 @@ def generate_sag4n_input_file(input_data: dict) -> str:
         input_data["sub_material"] = generate_material_input(
             input_data["gdml_file"], input_data["part"]
         )
-
-    output_stem = Path(input_data["output_file_sag4n"]).stem
+    output_stem = input_data["output_file_sag4n"].stem
 
     compiled_input = sag4n_input_template.format(
         sub_material=input_data["sub_material"],
@@ -311,22 +310,21 @@ def generate_sag4n_input_file(input_data: dict) -> str:
         return tmp_file.name
 
 
-def run_sag4n(
-        input_data: dict
-) -> None:
-    """ Wrapper for SaG4n. """
+def run_sag4n(input_data: dict) -> None:
+    """Wrapper for SaG4n."""
     with tempfile.TemporaryDirectory(
         prefix=".revertex_sag4n_", dir=str(Path.cwd())
     ) as tmpdir:
         input_path = Path(tmpdir) / "input.txt"
         output_stem = input_data["output_file_sag4n"].stem
 
-#        Path(tmpdir).chmod(0o777)
+        #        Path(tmpdir).chmod(0o777)
 
         input_path.write_text(
-            Path(input_data["input_file_sag4n"]).read_text(encoding="utf-8"), encoding="utf-8"
+            Path(input_data["input_file_sag4n"]).read_text(encoding="utf-8"),
+            encoding="utf-8",
         )
-#        Path(input_path).chmod(0o644)
+        #        Path(input_path).chmod(0o644)
 
         cmd = [
             "docker",
@@ -377,6 +375,9 @@ def run_sag4n(
             msg = f"SaG4n Docker execution failed: {details}"
             raise RuntimeError(msg) from exc
 
+        log.info("SaG4n output:")
+        log.info(proc.stdout)
+
         input_data["output_file_sag4n"].parent.mkdir(parents=True, exist_ok=True)
 
         main_output = Path(tmpdir) / f"{output_stem}.out"
@@ -388,7 +389,9 @@ def run_sag4n(
         for suffix in (".root", ".log"):
             companion = Path(tmpdir) / f"{output_stem}{suffix}"
             if companion.exists():
-                shutil.copy2(companion, input_data["output_file_sag4n"].with_suffix(suffix))
+                shutil.copy2(
+                    companion, input_data["output_file_sag4n"].with_suffix(suffix)
+                )
 
 
 def generate_alpha_n_spectrum(input_data: dict) -> None:
@@ -396,7 +399,7 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
     Generate an (alpha, n) spectrum using SaG4n and save it in LH5 format.
 
     There are several ways one can use this wrapper:
-     
+
     1. pre-prepared `input_file_sag4n`:
         The user provides a path `input_file_sag4n` to a valid SaG4n input file. Then only `output_file` has to be provided.
 
@@ -410,7 +413,7 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
     - `n_events`: Number of events to simulate in SaG4n. Default is 10 million.
     - `seed`: Random seed for the SaG4n simulation. Default is 1234567.
     - `docker_image`: Name of the Docker image to use for running SaG4n. Default is 'moritzneuberger/sag4n-for-revertex:latest'.
-    - `output_file_sag4n`: Folder and stemp path of SaG4n output files (.out, .root, .log). These are usually temporary files deleted after processing.
+    - `output_file_sag4n`: Folder and stem path of SaG4n output files (.out, .root, .log). These are usually temporary files deleted after processing.
     """
 
     if "output_file" not in input_data:
@@ -436,9 +439,15 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
         msg = f"Docker image '{input_data['docker_image']}' not found. Please pull it with 'docker pull {input_data['docker_image']}'."
         raise RuntimeError(msg) from None
 
+    if "output_file_sag4n" in input_data:
+        input_data["output_file_sag4n"] = Path(input_data["output_file_sag4n"])
+    else:
+        tmp_file = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
+        output_file = tmp_file.name
+        tmp_file.close()
+        input_data["output_file_sag4n"] = Path(output_file)
 
     if "input_file_sag4n" not in input_data:
-
         if "sub_material" not in input_data:
             if "gdml_file" not in input_data or "part" not in input_data:
                 msg = "Either 'sub_material' or both 'gdml_file' and 'part' must be provided in input_data."
@@ -458,19 +467,13 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
         input_data["input_file_sag4n"] = input_file
     input_data["input_file_sag4n"] = Path(input_data["input_file_sag4n"])
 
-    if "output_file_sag4n" in input_data:
-        input_data["output_file_sag4n"] = Path(input_data["output_file_sag4n"])
-    else:
-        tmp_file = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
-        output_file = tmp_file.name
-        tmp_file.close()
-        input_data["output_file_sag4n"] = Path(output_file)
-
     run_sag4n(input_data)
     sag4n_output = read_sag4n_output(input_data)
 
     evt_data = sag4n_output["evts"]
     integral_yield = sag4n_output["integral_yield"]
+    msg = f"Integral yield: {integral_yield:.3e} (n/alpha)"
+    log.info(msg)
 
     save_sag4n_output_to_lh5(
         prepare_sag4n_output_for_lh5(evt_data),
