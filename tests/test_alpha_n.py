@@ -105,7 +105,7 @@ def test_generate_sag4n_input_file(test_gdml):
     input_data = {
         "gdml_file": test_gdml,
         "part": "V99000A",
-        "source_chain": "th232",
+        "source_chain": "Th232",
         "n_events": 1000,
     }
 
