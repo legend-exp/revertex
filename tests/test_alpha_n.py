@@ -1,15 +1,80 @@
 from __future__ import annotations
 
+import tempfile
 from pathlib import Path
 
 import awkward as ak
 import pyg4ometry as pyg4
+import pytest
 
+from revertex.generators import alpha_n
 from revertex.generators.alpha_n import (
     generate_material_input,
     generate_sag4n_input_file,
     prepare_sag4n_output_for_lh5,
 )
+
+
+def test_detect_container_runtime_uses_shifter_when_docker_missing(monkeypatch):
+    def _fake_which(cmd):
+        if cmd == "docker":
+            return None
+        if cmd == "shifter":
+            return "/usr/bin/shifter"
+        return None
+
+    monkeypatch.setattr(alpha_n.shutil, "which", _fake_which)
+
+    assert alpha_n._detect_container_runtime({}) == "shifter"
+
+
+def test_detect_container_runtime_rejects_unsupported_runtime(monkeypatch):
+    monkeypatch.setattr(alpha_n.shutil, "which", lambda _cmd: "/usr/bin/anything")
+
+    with pytest.raises(ValueError, match="Unsupported container runtime"):
+        alpha_n._detect_container_runtime({"container_runtime": "podman"})
+
+
+def test_build_container_run_command_shifter_adds_docker_source_prefix():
+    cmd = alpha_n._build_container_run_command(
+        "shifter", "moritzneuberger/sag4n-for-revertex:latest", "/tmp/work"
+    )
+
+    assert cmd[0] == "shifter"
+    assert "--image=docker:moritzneuberger/sag4n-for-revertex:latest" in cmd
+
+
+def test_check_container_image_shifter_accepts_ready_image(monkeypatch):
+    class _Completed:
+        def __init__(self, stdout):
+            self.stdout = stdout
+
+    def _fake_run(*_args, **_kwargs):
+        return _Completed(
+            "perlmutter docker READY 9682fadb8f 2026-03-24T03:05:41 moritzneuberger/sag4n-for-revertex:latest\n"
+        )
+
+    monkeypatch.setattr(alpha_n.subprocess, "run", _fake_run)
+
+    alpha_n._check_container_image(
+        "shifter", "moritzneuberger/sag4n-for-revertex:latest"
+    )
+
+
+def test_check_container_image_shifter_raises_when_missing(monkeypatch):
+    class _Completed:
+        def __init__(self, stdout):
+            self.stdout = stdout
+
+    def _fake_run(*_args, **_kwargs):
+        return _Completed("")
+
+    monkeypatch.setattr(alpha_n.subprocess, "run", _fake_run)
+
+    with pytest.raises(RuntimeError, match="Shifter image"):
+        alpha_n._check_container_image(
+            "shifter", "moritzneuberger/sag4n-for-revertex:latest"
+        )
 
 
 def test_generate_material_input(test_gdml):
@@ -102,11 +167,16 @@ def test_generate_material_input_for_natoms_material(tmp_path):
 
 
 def test_generate_sag4n_input_file(test_gdml):
+    tmp_file = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
+    output_file = tmp_file.name
+    tmp_file.close()
+
     input_data = {
         "gdml_file": test_gdml,
         "part": "V99000A",
         "source_chain": "Th232",
         "n_events": 1000,
+        "output_file_sag4n": Path(output_file),
     }
 
     input_file = generate_sag4n_input_file(input_data)

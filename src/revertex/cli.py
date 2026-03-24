@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import argparse
 import logging
+import random
 
 import pyg4ometry
 
@@ -246,14 +247,20 @@ def cli(args=None) -> None:
     alpha_n_parser.add_argument(
         "--seed",
         type=int,
-        default=1234567,
-        help="Option for users to use custom seeds. Default is 1234567.",
+        default=-1,
+        help="Option for users to use custom seeds. If not set, a random seed will be used.",
     )
     alpha_n_parser.add_argument(
-        "--docker-image",
+        "--container-runtime",
+        type=str,
+        default="",
+        help="Container runtime for SaG4n ('docker' or 'shifter'). If omitted, runtime is auto-detected.",
+    )
+    alpha_n_parser.add_argument(
+        "--container-image",
         type=str,
         default="moritzneuberger/sag4n-for-revertex:latest",
-        help="Name of the Docker image to use for running SaG4n. Default is 'moritzneuberger/sag4n-for-revertex:latest'.",
+        help="Container image used to run SaG4n.",
     )
     alpha_n_parser.add_argument(
         "--output-file-sag4n",
@@ -347,21 +354,34 @@ def cli(args=None) -> None:
             positions=pos,
         )
     elif args.command == "alpha-n-kin":
+        if args.seed == -1:
+            random.seed()
+            args.seed = random.randint(0, 1e5)
+
         input_data = {
             "output_file": args.output_file,
             "n_events": args.n_events,
             "seed": args.seed,
-            "docker-image": args.docker_image,
+            "container_image": args.container_image,
         }
+
+        if args.container_runtime != "":
+            input_data["container_runtime"] = args.container_runtime
 
         if args.input_file_sag4n != "":
             input_data["input_file_sag4n"] = args.input_file_sag4n
         elif args.sub_material != "":
             input_data["sub_material"] = args.sub_material
+            if args.source_chain == "":
+                msg = "When using the 'sub-material' option, you also need to provide a 'source-chain' (with --source-chain) to specify the radiogenic chain to be used as alpha source."
+                raise RuntimeError(msg)
             input_data["source_chain"] = args.source_chain
         elif args.gdml_file != "" and args.part != "":
             input_data["gdml_file"] = args.gdml_file
             input_data["part"] = args.part
+            if args.source_chain == "":
+                msg = "When using the 'gdml-file' and 'part' options, you also need to provide a 'source-chain' (with --source-chain) to specify the radiogenic chain to be used as alpha source."
+                raise RuntimeError(msg)
             input_data["source_chain"] = args.source_chain
         else:
             msg = "For the alpha-n-kin option, you need to provide either a valid SaG4n input file in `input-file-sag4n`, or a substitution string for the material in `sub-material` (with `source-chain`) or a gdml file `gdml-file` and name of a logical volume `part` from which to take the material information (with `source-chain`)."
@@ -384,7 +404,10 @@ def cli(args=None) -> None:
         msg += f"output_file:    {args.output_file} \n"
         msg += f"seed:      {args.seed} \n"
         msg += f"n_events:      {args.n_events} \n"
-        msg += f"docker-image: {args.docker_image} \n"
+        if args.container_runtime != "":
+            msg += f"container-runtime: {args.container_runtime} \n"
+        if args.container_image != "":
+            msg += f"container-image: {args.container_image} \n"
         log.info(msg)
 
         alpha_n.generate_alpha_n_spectrum(input_data)

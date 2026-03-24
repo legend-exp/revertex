@@ -218,14 +218,13 @@ def collect_isotopes(
             if nist_name is None:
                 msg = f"Cannot resolve natural isotope abundances for Z={z}."
                 raise ValueError(msg)
+            # Use a fresh registry to expand NIST element to isotopes.
+            # We only need the isotope components, not to store the element.
+            temp_registry = pyg4.geant4.Registry()
             nist_element = pyg4.geant4.nist_element_2geant4Element(
-                nist_name, nist_registry
+                nist_name, temp_registry
             )
             sub_components = nist_element.components
-
-        if not sub_components:
-            msg = f"Cannot infer reference mass for component '{getattr(component, 'name', component)}'."
-            raise ValueError(msg)
 
         if any(
             str(comp_kind).lower() == "massfraction"
@@ -264,7 +263,10 @@ def collect_isotopes(
         if nist_name is None:
             msg = f"Cannot resolve natural isotope abundances for Z={z}."
             raise ValueError(msg)
-        nist_element = pyg4.geant4.nist_element_2geant4Element(nist_name, nist_registry)
+        # Use a fresh registry to expand NIST element to isotopes.
+        # We only need the isotope components, not to store the element.
+        temp_registry = pyg4.geant4.Registry()
+        nist_element = pyg4.geant4.nist_element_2geant4Element(nist_name, temp_registry)
         sub_components = nist_element.components
 
     if not sub_components:
