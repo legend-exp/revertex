@@ -435,21 +435,20 @@ def generate_sag4n_input_file(input_data: dict) -> str:
 
 def run_sag4n(input_data: dict) -> None:
     """Wrapper for SaG4n."""
-    with tempfile.TemporaryDirectory(
-        prefix=".revertex_sag4n_", dir=str(Path.cwd())
-    ) as tmpdir:
+    runtime = input_data["container_runtime"]
+    image = input_data["container_image"]
+    output_stem = input_data["sag4n_output_stem"]
+    
+    # For Shifter, explicitly use /tmp which is guaranteed to be accessible
+    tmpdir_arg = "/tmp" if runtime == "shifter" else None
+    
+    with tempfile.TemporaryDirectory(prefix=".revertex_sag4n_", dir=tmpdir_arg) as tmpdir:
         input_path = Path(tmpdir) / "input.txt"
-        runtime = input_data["container_runtime"]
-        image = input_data["container_image"]
-        output_stem = input_data["sag4n_output_stem"]
-
-        #        Path(tmpdir).chmod(0o777)
 
         input_path.write_text(
             Path(input_data["input_file_sag4n"]).read_text(encoding="utf-8"),
             encoding="utf-8",
         )
-        #        Path(input_path).chmod(0o644)
 
         cmd = _build_container_run_command(runtime, image, tmpdir)
 
@@ -486,6 +485,17 @@ def run_sag4n(input_data: dict) -> None:
                 and "docker daemon socket" in details.lower()
             ):
                 msg = "Cannot access Docker daemon socket. Ensure your user has permission to run Docker (e.g. join the 'docker' group or use rootless Docker), then retry."
+                raise RuntimeError(msg) from exc
+            if runtime == "shifter" and (
+                "bind mount failed" in details.lower()
+                or "failed to setup user-requested mounts" in details.lower()
+                or "unclean exit from bind-mount routine" in details.lower()
+            ):
+                msg = (
+                    "Shifter failed to bind-mount the temporary working directory. "
+                    "Set TMPDIR environment variable to a Shifter-accessible path "
+                    "(e.g., TMPDIR=/tmp or TMPDIR=$SCRATCH) and retry."
+                )
                 raise RuntimeError(msg) from exc
             if "/data/input.txt" in details and "permission denied" in details.lower():
                 msg = f"{runtime.capitalize()} could not read /data/input.txt inside the container. This is usually caused by host filesystem permission restrictions on the bind mount."
@@ -532,8 +542,8 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
     Additional optional input is:
     - `n_events`: Number of events to simulate in SaG4n. Default is 10 million.
     - `seed`: Random seed for the SaG4n simulation. Default is 1234567.
-        - `container_runtime`: Container runtime to use (`docker` or `shifter`). If omitted, the script auto-detects (`docker` first, then `shifter`).
-        - `container_image`: Name of the container image used to run SaG4n. Default is 'moritzneuberger/sag4n-for-revertex:latest'.
+    - `container_runtime`: Container runtime to use (`docker` or `shifter`). If omitted, the script auto-detects (`docker` first, then `shifter`).
+    - `container_image`: Name of the container image used to run SaG4n. Default is 'moritzneuberger/sag4n-for-revertex:latest'.
     - `output_file_sag4n`: Folder and stem path of SaG4n output files (.out, .root, .log). These are usually temporary files deleted after processing.
     """
 
