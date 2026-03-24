@@ -254,6 +254,7 @@ def prepare_sag4n_output_for_lh5(ak_array: ak.Array) -> ak.Array:
 def save_sag4n_output_to_lh5(
     ak_array: ak.Array,
     integral_yield: float,
+    n_valid_events: int,
     output_file: str | Path,
     eunit: str = "keV",
     tunit: str = "ns",
@@ -277,6 +278,11 @@ def save_sag4n_output_to_lh5(
     lh5.write(
         types.Scalar(integral_yield),
         "misc/integral_yield",
+        output_file,
+        wo_mode="append",
+    )
+    lh5.write(types.Scalar(n_valid_events),
+        "misc/n_valid_events",
         output_file,
         wo_mode="append",
     )
@@ -618,3 +624,5 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
         integral_yield,
         input_data["output_file"],
     )
+
+    return np.sum(evt_data["n_part"] > 0)
