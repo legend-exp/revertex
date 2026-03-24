@@ -438,11 +438,13 @@ def run_sag4n(input_data: dict) -> None:
     runtime = input_data["container_runtime"]
     image = input_data["container_image"]
     output_stem = input_data["sag4n_output_stem"]
-    
+
     # For Shifter, explicitly use /tmp which is guaranteed to be accessible
     tmpdir_arg = "/tmp" if runtime == "shifter" else None
-    
-    with tempfile.TemporaryDirectory(prefix=".revertex_sag4n_", dir=tmpdir_arg) as tmpdir:
+
+    with tempfile.TemporaryDirectory(
+        prefix=".revertex_sag4n_", dir=tmpdir_arg
+    ) as tmpdir:
         input_path = Path(tmpdir) / "input.txt"
 
         input_path.write_text(
