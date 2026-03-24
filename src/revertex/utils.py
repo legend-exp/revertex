@@ -177,6 +177,13 @@ def collect_isotopes(
             return float(value.eval())
         return float(value)
 
+    def _resolve_component_reference(component, nist_registry):
+        if isinstance(component, str):
+            material_dict = getattr(nist_registry, "materialDict", None)
+            if isinstance(material_dict, dict) and component in material_dict:
+                return material_dict[component]
+        return component
+
     def _component_mass_weight(
         component,
         comp_value,
@@ -206,6 +213,8 @@ def collect_isotopes(
         nist_element_z_to_name: dict[int, str],
         pyg4,
     ) -> float:
+        component = _resolve_component_reference(component, nist_registry)
+
         if component.__class__.__name__ == "Isotope":
             if hasattr(component, "a"):
                 return _to_float(component.a)
@@ -225,6 +234,9 @@ def collect_isotopes(
                 nist_name, temp_registry
             )
             sub_components = nist_element.components
+
+        if not sub_components and hasattr(component, "A"):
+            return _to_float(component.A)
 
         if any(
             str(comp_kind).lower() == "massfraction"
@@ -249,6 +261,8 @@ def collect_isotopes(
             )
         )
 
+    component = _resolve_component_reference(component, nist_registry)
+
     if component.__class__.__name__ == "Isotope":
         z = round(_to_float(component.Z))
         a = round(_to_float(component.N))
@@ -268,6 +282,13 @@ def collect_isotopes(
         temp_registry = pyg4.geant4.Registry()
         nist_element = pyg4.geant4.nist_element_2geant4Element(nist_name, temp_registry)
         sub_components = nist_element.components
+
+    if not sub_components and hasattr(component, "Z") and hasattr(component, "A"):
+        z = round(_to_float(component.Z))
+        a = round(_to_float(component.A))
+        zaid = z * 1000 + a
+        isotopes[zaid] = isotopes.get(zaid, 0.0) + scale
+        return
 
     if not sub_components:
         msg = f"Cannot expand material component '{getattr(component, 'name', component)}' into isotopes."

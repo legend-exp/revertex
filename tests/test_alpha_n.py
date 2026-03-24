@@ -4,6 +4,7 @@ import tempfile
 from pathlib import Path
 
 import awkward as ak
+import numpy as np
 import pyg4ometry as pyg4
 import pytest
 
@@ -13,68 +14,6 @@ from revertex.generators.alpha_n import (
     generate_sag4n_input_file,
     prepare_sag4n_output_for_lh5,
 )
-
-
-def test_detect_container_runtime_uses_shifter_when_docker_missing(monkeypatch):
-    def _fake_which(cmd):
-        if cmd == "docker":
-            return None
-        if cmd == "shifter":
-            return "/usr/bin/shifter"
-        return None
-
-    monkeypatch.setattr(alpha_n.shutil, "which", _fake_which)
-
-    assert alpha_n._detect_container_runtime({}) == "shifter"
-
-
-def test_detect_container_runtime_rejects_unsupported_runtime(monkeypatch):
-    monkeypatch.setattr(alpha_n.shutil, "which", lambda _cmd: "/usr/bin/anything")
-
-    with pytest.raises(ValueError, match="Unsupported container runtime"):
-        alpha_n._detect_container_runtime({"container_runtime": "podman"})
-
-
-def test_build_container_run_command_shifter_adds_docker_source_prefix():
-    cmd = alpha_n._build_container_run_command(
-        "shifter", "moritzneuberger/sag4n-for-revertex:latest", "/tmp/work"
-    )
-
-    assert cmd[0] == "shifter"
-    assert "--image=docker:moritzneuberger/sag4n-for-revertex:latest" in cmd
-
-
-def test_check_container_image_shifter_accepts_ready_image(monkeypatch):
-    class _Completed:
-        def __init__(self, stdout):
-            self.stdout = stdout
-
-    def _fake_run(*_args, **_kwargs):
-        return _Completed(
-            "perlmutter docker READY 9682fadb8f 2026-03-24T03:05:41 moritzneuberger/sag4n-for-revertex:latest\n"
-        )
-
-    monkeypatch.setattr(alpha_n.subprocess, "run", _fake_run)
-
-    alpha_n._check_container_image(
-        "shifter", "moritzneuberger/sag4n-for-revertex:latest"
-    )
-
-
-def test_check_container_image_shifter_raises_when_missing(monkeypatch):
-    class _Completed:
-        def __init__(self, stdout):
-            self.stdout = stdout
-
-    def _fake_run(*_args, **_kwargs):
-        return _Completed("")
-
-    monkeypatch.setattr(alpha_n.subprocess, "run", _fake_run)
-
-    with pytest.raises(RuntimeError, match="Shifter image"):
-        alpha_n._check_container_image(
-            "shifter", "moritzneuberger/sag4n-for-revertex:latest"
-        )
 
 
 def test_generate_material_input(test_gdml):
@@ -207,3 +146,272 @@ def test_prepare_sag4n_output_for_lh5_handles_empty_array():
     prepared = prepare_sag4n_output_for_lh5(empty)
     assert len(prepared["px"]) == 0
     assert len(prepared["g4_pid"]) == 0
+
+
+def test_detect_container_runtime_uses_shifter_when_docker_missing(monkeypatch):
+    def _fake_which(cmd):
+        if cmd == "docker":
+            return None
+        if cmd == "shifter":
+            return "/usr/bin/shifter"
+        return None
+
+    monkeypatch.setattr(alpha_n.shutil, "which", _fake_which)
+
+    assert alpha_n._detect_container_runtime({}) == "shifter"
+
+
+def test_check_container_image_shifter_raises_when_missing(monkeypatch):
+    class _Completed:
+        def __init__(self, stdout):
+            self.stdout = stdout
+
+    def _fake_run(*_args, **_kwargs):
+        return _Completed("")
+
+    monkeypatch.setattr(alpha_n.subprocess, "run", _fake_run)
+
+    with pytest.raises(RuntimeError, match="Shifter image"):
+        alpha_n._check_container_image(
+            "shifter", "moritzneuberger/sag4n-for-revertex:latest"
+        )
+
+
+def test_detect_container_runtime_requested_runtime_missing(monkeypatch):
+    monkeypatch.setattr(alpha_n.shutil, "which", lambda _cmd: None)
+
+    with pytest.raises(RuntimeError, match="was not found in PATH"):
+        alpha_n._detect_container_runtime({"container_runtime": "docker"})
+
+
+def test_detect_container_runtime_raises_when_no_runtime_available(monkeypatch):
+    monkeypatch.setattr(alpha_n.shutil, "which", lambda _cmd: None)
+
+    with pytest.raises(RuntimeError, match="No supported container runtime found"):
+        alpha_n._detect_container_runtime({})
+
+
+def test_build_container_run_command_docker():
+    cmd = alpha_n._build_container_run_command("docker", "repo/image:tag", "/tmp/work")
+
+    assert cmd == [
+        "docker",
+        "run",
+        "--rm",
+        "-v",
+        "/tmp/work:/data",
+        "-w",
+        "/data",
+        "repo/image:tag",
+        "input.txt",
+    ]
+
+
+def test_check_container_image_docker_raises_when_missing(monkeypatch):
+    def _fake_run(*_args, **_kwargs):
+        raise alpha_n.subprocess.CalledProcessError(1, ["docker", "image", "inspect"])
+
+    monkeypatch.setattr(alpha_n.subprocess, "run", _fake_run)
+
+    with pytest.raises(RuntimeError, match="Docker image"):
+        alpha_n._check_container_image("docker", "repo/image:tag")
+
+
+def test_check_container_image_shifter_raises_when_query_fails(monkeypatch):
+    def _fake_run(*_args, **_kwargs):
+        raise alpha_n.subprocess.CalledProcessError(
+            1, ["shifterimg", "images"], stderr="backend unavailable"
+        )
+
+    monkeypatch.setattr(alpha_n.subprocess, "run", _fake_run)
+
+    with pytest.raises(RuntimeError, match="Failed to query Shifter images"):
+        alpha_n._check_container_image("shifter", "repo/image:tag")
+
+
+def test_calculate_integral_yield_scales_with_alphas_per_decay():
+    weights = np.array([0.5, 2.0, 1.5, 5.0])
+    particles = np.array(["neutron", "gamma", "neutron", "gamma"])
+
+    integral_yield = alpha_n.calculate_integral_yield(
+        weights, particles, n_events=20, decay_chain="Th232"
+    )
+
+    assert integral_yield == pytest.approx((0.5 + 1.5) / 20 * 6)
+
+
+def test_read_sag4n_output_parses_event_file(tmp_path):
+    output_file = tmp_path / "sag4n.out"
+    output_file.write_text(
+        "# comment\n"
+        "EventNumber particle ekin weight x y z px py pz\n"
+        "0 neutron 1.0 0.25 0 0 0 1 0 0\n"
+        "0 gamma 2.0 0.50 0 0 0 0 1 0\n"
+        "1 neutron 3.0 0.75 0 0 0 0 0 1\n",
+        encoding="utf-8",
+    )
+
+    result = alpha_n.read_sag4n_output(
+        {
+            "output_file_sag4n": output_file,
+            "n_events": 10,
+            "source_chain": "U238_lower",
+        }
+    )
+
+    assert len(result["evts"]["evtid"]) == 3
+    assert result["evts"]["particle"][0] == "neutron"
+    assert result["integral_yield"] == pytest.approx((0.25 + 0.75) / 10 * 4)
+
+
+def test_prepare_sag4n_output_for_lh5_non_empty_mapping():
+    evts = ak.Array(
+        {
+            "evtid": [10, 10, 11],
+            "particle": ["neutron", "gamma", "neutron"],
+            "ekin": [1.0, 2.0, 3.0],
+            "weight": [1.0, 1.0, 1.0],
+            "x": [0.0, 0.0, 0.0],
+            "y": [0.0, 0.0, 0.0],
+            "z": [0.0, 0.0, 0.0],
+            "px": [1.0, 0.0, 0.0],
+            "py": [0.0, 1.0, 0.0],
+            "pz": [0.0, 0.0, 1.0],
+        }
+    )
+
+    prepared = prepare_sag4n_output_for_lh5(evts)
+
+    assert prepared["g4_pid"].to_list() == [2112, 22, 2112]
+    assert prepared["n_part"].to_list() == [2.0, 0.0, 1.0]
+    assert prepared["time"].to_list() == [0.0, 0.0, 0.0]
+
+
+def test_generate_sag4n_input_file_uses_sub_material_without_gdml(tmp_path):
+    input_data = {
+        "sub_material": "MATERIAL 1 MyMat 1.0 1\n1001 -1\nENDMATERIAL\n",
+        "source_chain": "U238_upper",
+        "n_events": 42,
+        "seed": 99,
+        "output_file_sag4n": tmp_path / "my_result.out",
+    }
+
+    input_file = Path(generate_sag4n_input_file(input_data))
+    content = input_file.read_text(encoding="utf-8")
+
+    assert "MATERIAL 1 MyMat 1.0 1" in content
+    assert "NEVENTS 42" in content
+    assert "SEED 99" in content
+    assert "OUTPUTFILE /data/my_result" in content
+
+
+def test_generate_sag4n_input_file_raises_without_material_or_gdml(tmp_path):
+    with pytest.raises(ValueError, match="Either 'sub_material'"):
+        generate_sag4n_input_file(
+            {
+                "source_chain": "Th232",
+                "output_file_sag4n": tmp_path / "out.out",
+            }
+        )
+
+
+def test_generate_alpha_n_spectrum_requires_output_file():
+    with pytest.raises(ValueError, match="'output_file' must be provided"):
+        alpha_n.generate_alpha_n_spectrum({})
+
+
+def test_generate_alpha_n_spectrum_from_input_file_without_container_execution(
+    monkeypatch, tmp_path
+):
+    input_text = (
+        "HEADER\n"
+        "OUTPUTFILE /data/from_input_file\n"
+        f"{alpha_n.SAG4N_SOURCES['Th232'].strip()}\n"
+    )
+    input_file = tmp_path / "input.txt"
+    input_file.write_text(input_text, encoding="utf-8")
+
+    captured: dict = {}
+
+    def _fake_detect_runtime(_input_data):
+        return "docker"
+
+    def _fake_check_image(_runtime, _image):
+        return None
+
+    def _fake_run_sag4n(input_data):
+        captured["run_source_chain"] = input_data["source_chain"]
+        captured["run_output_stem"] = input_data["sag4n_output_stem"]
+
+    def _fake_read(_input_data):
+        return {
+            "evts": ak.Array(
+                {
+                    "evtid": [0],
+                    "particle": ["neutron"],
+                    "ekin": [1.0],
+                    "weight": [1.0],
+                    "x": [0.0],
+                    "y": [0.0],
+                    "z": [0.0],
+                    "px": [1.0],
+                    "py": [0.0],
+                    "pz": [0.0],
+                }
+            ),
+            "integral_yield": 1.23,
+        }
+
+    def _fake_prepare(evt_data):
+        return evt_data
+
+    def _fake_save(ak_array, integral_yield, output_file, eunit="keV", tunit="ns"):
+        captured["saved_integral_yield"] = integral_yield
+        captured["saved_output_file"] = Path(output_file)
+        captured["saved_entries"] = len(ak_array["evtid"])
+        captured["saved_units"] = (eunit, tunit)
+
+    monkeypatch.setattr(alpha_n, "_detect_container_runtime", _fake_detect_runtime)
+    monkeypatch.setattr(alpha_n, "_check_container_image", _fake_check_image)
+    monkeypatch.setattr(alpha_n, "run_sag4n", _fake_run_sag4n)
+    monkeypatch.setattr(alpha_n, "read_sag4n_output", _fake_read)
+    monkeypatch.setattr(alpha_n, "prepare_sag4n_output_for_lh5", _fake_prepare)
+    monkeypatch.setattr(alpha_n, "save_sag4n_output_to_lh5", _fake_save)
+
+    alpha_n.generate_alpha_n_spectrum(
+        {
+            "output_file": tmp_path / "result.lh5",
+            "input_file_sag4n": input_file,
+            "container_image": "repo/image:tag",
+        }
+    )
+
+    assert captured["run_source_chain"] == "Th232"
+    assert captured["run_output_stem"] == "from_input_file"
+    assert captured["saved_integral_yield"] == pytest.approx(1.23)
+    assert captured["saved_output_file"].name == "result.lh5"
+    assert captured["saved_entries"] == 1
+    assert captured["saved_units"] == ("keV", "ns")
+
+
+def test_generate_alpha_n_spectrum_fails_when_source_chain_missing_in_input_file(
+    monkeypatch, tmp_path
+):
+    bad_input_file = tmp_path / "bad_input.txt"
+    bad_input_file.write_text("OUTPUTFILE /data/no_chain\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        alpha_n, "_detect_container_runtime", lambda _input_data: "docker"
+    )
+    monkeypatch.setattr(
+        alpha_n, "_check_container_image", lambda _runtime, _image: None
+    )
+
+    with pytest.raises(ValueError, match="Could not detect source chain"):
+        alpha_n.generate_alpha_n_spectrum(
+            {
+                "output_file": tmp_path / "result.lh5",
+                "input_file_sag4n": bad_input_file,
+                "container_image": "repo/image:tag",
+            }
+        )
