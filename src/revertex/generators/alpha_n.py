@@ -367,6 +367,7 @@ def run_sag4n(input_data: dict) -> None:
     tmpdir_arg = "/tmp" if runtime == "shifter" else None
 
     with tempfile.TemporaryDirectory(prefix=".revertex_sag4n_", dir=tmpdir_arg) as tmpdir:
+
         input_path = Path(tmpdir) / "input.txt"
 
         input_path.write_text(
@@ -619,10 +620,14 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
     msg = f"Integral yield: {integral_yield:.3e} (n/alpha)"
     log.info(msg)
 
+    n_valid_events = np.sum(evt_data["n_part"] > 0)
+    log.info(f"Number of valid events with n_part > 0: {n_valid_events}")
+
     save_sag4n_output_to_lh5(
         prepare_sag4n_output_for_lh5(evt_data),
         integral_yield,
-        input_data["output_file"],
+        n_valid_events,
+        input_data["output_file"]
     )
 
-    return np.sum(evt_data["n_part"] > 0)
+    return n_valid_events
