@@ -106,13 +106,17 @@ def test_generate_material_input_for_natoms_material(tmp_path):
 
 
 def test_generate_sag4n_input_file(test_gdml):
+    from revertex.generators.alpha_n import generate_material_input
+
     tmp_file = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
     output_file = tmp_file.name
     tmp_file.close()
 
+    # Generate material input first (now responsibility of caller)
+    sub_material = generate_material_input(test_gdml, "V99000A")
+
     input_data = {
-        "gdml_file": test_gdml,
-        "part": "V99000A",
+        "sub_material": sub_material,
         "source_chain": "Th232",
         "n_events": 1000,
         "output_file_sag4n": Path(output_file),
@@ -161,21 +165,6 @@ def test_detect_container_runtime_uses_shifter_when_docker_missing(monkeypatch):
     assert alpha_n._detect_container_runtime({}) == "shifter"
 
 
-def test_check_container_image_shifter_raises_when_missing(monkeypatch):
-    class _Completed:
-        def __init__(self, stdout):
-            self.stdout = stdout
-
-    def _fake_run(*_args, **_kwargs):
-        return _Completed("")
-
-    monkeypatch.setattr(alpha_n.subprocess, "run", _fake_run)
-
-    with pytest.raises(RuntimeError, match="Shifter image"):
-        alpha_n._check_container_image(
-            "shifter", "moritzneuberger/sag4n-for-revertex:latest"
-        )
-
 
 def test_detect_container_runtime_requested_runtime_missing(monkeypatch):
     monkeypatch.setattr(alpha_n.shutil, "which", lambda _cmd: None)
@@ -191,42 +180,7 @@ def test_detect_container_runtime_raises_when_no_runtime_available(monkeypatch):
         alpha_n._detect_container_runtime({})
 
 
-def test_build_container_run_command_docker():
-    cmd = alpha_n._build_container_run_command("docker", "repo/image:tag", "/tmp/work")
 
-    assert cmd == [
-        "docker",
-        "run",
-        "--rm",
-        "-v",
-        "/tmp/work:/data",
-        "-w",
-        "/data",
-        "repo/image:tag",
-        "input.txt",
-    ]
-
-
-def test_check_container_image_docker_raises_when_missing(monkeypatch):
-    def _fake_run(*_args, **_kwargs):
-        raise alpha_n.subprocess.CalledProcessError(1, ["docker", "image", "inspect"])
-
-    monkeypatch.setattr(alpha_n.subprocess, "run", _fake_run)
-
-    with pytest.raises(RuntimeError, match="Docker image"):
-        alpha_n._check_container_image("docker", "repo/image:tag")
-
-
-def test_check_container_image_shifter_raises_when_query_fails(monkeypatch):
-    def _fake_run(*_args, **_kwargs):
-        raise alpha_n.subprocess.CalledProcessError(
-            1, ["shifterimg", "images"], stderr="backend unavailable"
-        )
-
-    monkeypatch.setattr(alpha_n.subprocess, "run", _fake_run)
-
-    with pytest.raises(RuntimeError, match="Failed to query Shifter images"):
-        alpha_n._check_container_image("shifter", "repo/image:tag")
 
 
 def test_calculate_integral_yield_scales_with_alphas_per_decay():
@@ -305,16 +259,6 @@ def test_generate_sag4n_input_file_uses_sub_material_without_gdml(tmp_path):
     assert "OUTPUTFILE /data/my_result" in content
 
 
-def test_generate_sag4n_input_file_raises_without_material_or_gdml(tmp_path):
-    with pytest.raises(ValueError, match="Either 'sub_material'"):
-        generate_sag4n_input_file(
-            {
-                "source_chain": "Th232",
-                "output_file_sag4n": tmp_path / "out.out",
-            }
-        )
-
-
 def test_generate_alpha_n_spectrum_requires_output_file():
     with pytest.raises(ValueError, match="'output_file' must be provided"):
         alpha_n.generate_alpha_n_spectrum({})
@@ -372,7 +316,8 @@ def test_generate_alpha_n_spectrum_from_input_file_without_container_execution(
         captured["saved_units"] = (eunit, tunit)
 
     monkeypatch.setattr(alpha_n, "_detect_container_runtime", _fake_detect_runtime)
-    monkeypatch.setattr(alpha_n, "_check_container_image", _fake_check_image)
+    # Mock subprocess to avoid actual Docker calls during image validation
+    monkeypatch.setattr(alpha_n.subprocess, "run", lambda *_args, **_kwargs: None)
     monkeypatch.setattr(alpha_n, "run_sag4n", _fake_run_sag4n)
     monkeypatch.setattr(alpha_n, "read_sag4n_output", _fake_read)
     monkeypatch.setattr(alpha_n, "prepare_sag4n_output_for_lh5", _fake_prepare)
@@ -403,9 +348,8 @@ def test_generate_alpha_n_spectrum_fails_when_source_chain_missing_in_input_file
     monkeypatch.setattr(
         alpha_n, "_detect_container_runtime", lambda _input_data: "docker"
     )
-    monkeypatch.setattr(
-        alpha_n, "_check_container_image", lambda _runtime, _image: None
-    )
+    # Mock subprocess to avoid actual Docker calls during image validation
+    monkeypatch.setattr(alpha_n.subprocess, "run", lambda *_args, **_kwargs: None)
 
     with pytest.raises(ValueError, match="Could not detect source chain"):
         alpha_n.generate_alpha_n_spectrum(

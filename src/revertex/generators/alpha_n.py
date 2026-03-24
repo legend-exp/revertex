@@ -173,85 +173,7 @@ def _detect_container_runtime(input_data: dict) -> str:
     raise RuntimeError(msg)
 
 
-def _check_container_image(runtime: str, image: str) -> None:
-    """Validate container image availability for the selected runtime when supported."""
-    if runtime == "docker":
-        try:
-            subprocess.run(
-                ["docker", "image", "inspect", image],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError:
-            msg = f"Docker image '{image}' not found. Please pull it with 'docker pull {image}'."
-            raise RuntimeError(msg) from None
-    elif runtime == "shifter":
-        try:
-            proc = subprocess.run(
-                ["shifterimg", "images"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError as exc:
-            details = (exc.stderr or exc.stdout or str(exc)).strip()
-            msg = f"Failed to query Shifter images via 'shifterimg images': {details}"
-            raise RuntimeError(msg) from exc
 
-        candidates = {image}
-        if image.startswith("docker:"):
-            candidates.add(image.split("docker:", 1)[1])
-        else:
-            candidates.add(f"docker:{image}")
-
-        available = False
-        for line in proc.stdout.splitlines():
-            tokens = line.split()
-            if not tokens:
-                continue
-            if any(token in candidates for token in tokens):
-                available = True
-                break
-
-        if not available:
-            image_hint = image if image.startswith("docker:") else f"docker:{image}"
-            msg = (
-                f"Shifter image '{image}' is not available. "
-                f"Pull it first with 'shifterimg -v pull {image_hint}' and wait until status is READY."
-            )
-            raise RuntimeError(msg)
-
-
-def _build_container_run_command(runtime: str, image: str, mount_dir: str) -> list[str]:
-    """Build the runtime-specific command used to run SaG4n."""
-    if runtime == "docker":
-        return [
-            "docker",
-            "run",
-            "--rm",
-            "-v",
-            f"{mount_dir}:/data",
-            "-w",
-            "/data",
-            image,
-            "input.txt",
-        ]
-
-    if runtime == "shifter":
-        shifter_image = image
-        if ":" not in shifter_image.split("/")[0]:
-            shifter_image = f"docker:{shifter_image}"
-        return [
-            "shifter",
-            f"--image={shifter_image}",
-            f"--volume={mount_dir}:/data",
-            "--workdir=/data",
-            "input.txt",
-        ]
-
-    msg = f"Unsupported container runtime '{runtime}'."
-    raise ValueError(msg)
 
 
 def calculate_integral_yield(
@@ -405,15 +327,11 @@ def generate_material_input(gdml_file: str | Path, part: str) -> str:
 
 
 def generate_sag4n_input_file(input_data: dict) -> str:
-    """Helper function to generate valid SaG4n input files."""
-
-    if "sub_material" not in input_data:
-        if "gdml_file" not in input_data or "part" not in input_data:
-            msg = "Either 'sub_material' or both 'gdml_file' and 'part' must be provided in input_data."
-            raise ValueError(msg)
-        input_data["sub_material"] = generate_material_input(
-            input_data["gdml_file"], input_data["part"]
-        )
+    """Helper function to generate valid SaG4n input files.
+    
+    Assumes input_data already has required fields: sub_material, source_chain, output_file_sag4n.
+    Validation is the caller's responsibility.
+    """
     output_stem = input_data["output_file_sag4n"].stem
 
     compiled_input = SAG4N_INPUT_TEMPLATE.format(
@@ -438,10 +356,10 @@ def run_sag4n(input_data: dict) -> None:
     runtime = input_data["container_runtime"]
     image = input_data["container_image"]
     output_stem = input_data["sag4n_output_stem"]
-    
+
     # For Shifter, explicitly use /tmp which is guaranteed to be accessible
     tmpdir_arg = "/tmp" if runtime == "shifter" else None
-    
+
     with tempfile.TemporaryDirectory(prefix=".revertex_sag4n_", dir=tmpdir_arg) as tmpdir:
         input_path = Path(tmpdir) / "input.txt"
 
@@ -450,16 +368,43 @@ def run_sag4n(input_data: dict) -> None:
             encoding="utf-8",
         )
 
-        cmd = _build_container_run_command(runtime, image, tmpdir)
+        # Build runtime-specific container command
+        runtime = input_data["container_runtime"]
+        image = input_data["container_image"]
+        if runtime == "docker":
+            cmd = [
+                "docker",
+                "run",
+                "--rm",
+                "-v",
+                f"{tmpdir}:/data",
+                "-w",
+                "/data",
+                image,
+                "input.txt",
+            ]
+        elif runtime == "shifter":
+            shifter_image = image
+            if ":" not in shifter_image.split("/")[0]:
+                shifter_image = f"docker:{shifter_image}"
+            cmd = [
+                "shifter",
+                f"--image={shifter_image}",
+                f"--volume={tmpdir}:/data",
+                "--workdir=/data",
+                "sag4n-entrypoint",
+                "input.txt",
+            ]
+        else:
+            msg = f"Unsupported container runtime '{runtime}'."
+            raise ValueError(msg)
 
         try:
             proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
             (Path(tmpdir) / f"{output_stem}.log").write_text(
-                (
-                    (proc.stdout or "")
-                    + ("\n" if proc.stdout and proc.stderr else "")
-                    + (proc.stderr or "")
-                ),
+                (proc.stdout or "")
+                + ("\n" if proc.stdout and proc.stderr else "")
+                + (proc.stderr or ""),
                 encoding="utf-8",
             )
         except FileNotFoundError as exc:
@@ -473,11 +418,9 @@ def run_sag4n(input_data: dict) -> None:
             stdout = (exc.stdout or "").strip()
             details = stderr or stdout or str(exc)
             (Path(tmpdir) / f"{output_stem}.log").write_text(
-                (
-                    (exc.stdout or "")
-                    + ("\n" if exc.stdout and exc.stderr else "")
-                    + (exc.stderr or "")
-                ),
+                (exc.stdout or "")
+                + ("\n" if exc.stdout and exc.stderr else "")
+                + (exc.stderr or ""),
                 encoding="utf-8",
             )
             if (
@@ -552,9 +495,56 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
         raise ValueError(msg)
 
     input_data["container_runtime"] = _detect_container_runtime(input_data)
-    _check_container_image(
-        input_data["container_runtime"], input_data["container_image"]
-    )
+    
+    # Validate container image availability
+    runtime = input_data["container_runtime"]
+    image = input_data["container_image"]
+    if runtime == "docker":
+        try:
+            subprocess.run(
+                ["docker", "image", "inspect", image],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError:
+            msg = f"Docker image '{image}' not found. Please pull it with 'docker pull {image}'."
+            raise RuntimeError(msg) from None
+    elif runtime == "shifter":
+        try:
+            proc = subprocess.run(
+                ["shifterimg", "images"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            details = (exc.stderr or exc.stdout or str(exc)).strip()
+            msg = f"Failed to query Shifter images via 'shifterimg images': {details}"
+            raise RuntimeError(msg) from exc
+
+        candidates = {image}
+        if image.startswith("docker:"):
+            candidates.add(image.split("docker:", 1)[1])
+        else:
+            candidates.add(f"docker:{image}")
+
+        available = False
+        for line in proc.stdout.splitlines():
+            tokens = line.split()
+            if not tokens:
+                continue
+            if any(token in candidates for token in tokens):
+                available = True
+                break
+
+        if not available:
+            image_hint = image if image.startswith("docker:") else f"docker:{image}"
+            msg = (
+                f"Shifter image '{image}' is not available. "
+                f"Pull it first with 'shifterimg -v pull {image_hint}' and wait until status is READY."
+            )
+            raise RuntimeError(msg)
 
     if "output_file_sag4n" in input_data:
         input_data["output_file_sag4n"] = Path(input_data["output_file_sag4n"])
