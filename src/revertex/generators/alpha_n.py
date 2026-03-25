@@ -408,13 +408,29 @@ def run_sag4n(input_data: dict) -> None:
             raise ValueError(msg)
 
         try:
-            proc = subprocess.run(cmd, check=True, capture_output=True, text=True)
+            with subprocess.Popen(
+                cmd,
+                stdout=subprocess.PIPE,
+                stderr=subprocess.STDOUT,
+                text=True,
+                bufsize=1,
+            ) as proc:
+                output_lines = []
+                if proc.stdout is not None:
+                    for line in proc.stdout:
+                        log.info(line)
+                        output_lines.append(line)
+                proc.wait()
+
+            stdout_text = "".join(output_lines)
             (Path(tmpdir) / f"{output_stem}.log").write_text(
-                (proc.stdout or "")
-                + ("\n" if proc.stdout and proc.stderr else "")
-                + (proc.stderr or ""),
-                encoding="utf-8",
+                stdout_text, encoding="utf-8"
             )
+
+            if proc.returncode != 0:
+                raise subprocess.CalledProcessError(
+                    proc.returncode, cmd, output=stdout_text
+                )
         except FileNotFoundError as exc:
             msg = (
                 f"Container runtime executable '{runtime}' not found. "
@@ -422,15 +438,7 @@ def run_sag4n(input_data: dict) -> None:
             )
             raise RuntimeError(msg) from exc
         except subprocess.CalledProcessError as exc:
-            stderr = (exc.stderr or "").strip()
-            stdout = (exc.stdout or "").strip()
-            details = stderr or stdout or str(exc)
-            (Path(tmpdir) / f"{output_stem}.log").write_text(
-                (exc.stdout or "")
-                + ("\n" if exc.stdout and exc.stderr else "")
-                + (exc.stderr or ""),
-                encoding="utf-8",
-            )
+            details = (exc.output or exc.stdout or "").strip() or str(exc)
             if (
                 "permission denied" in details.lower()
                 and "docker daemon socket" in details.lower()
@@ -455,9 +463,6 @@ def run_sag4n(input_data: dict) -> None:
             input_file_content = input_path.read_text(encoding="utf-8")
             msg = f"SaG4n execution failed with {runtime}: {details}\n\nGenerated input file:\n{input_file_content}"
             raise RuntimeError(msg) from exc
-
-        log.info("SaG4n output:")
-        log.info(proc.stdout)
 
         input_data["output_file_sag4n"].parent.mkdir(parents=True, exist_ok=True)
 

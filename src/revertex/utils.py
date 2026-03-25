@@ -147,7 +147,7 @@ def setup_log(level: int | None = None) -> None:
     handler.setFormatter(colorlog.ColoredFormatter(fmt))
 
     logger = logging.getLogger("revertex")
-    # logger.addHandler(handler)
+    logger.addHandler(handler)
 
     if level is not None:
         logger.setLevel(level)
