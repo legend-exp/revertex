@@ -251,7 +251,7 @@ def prepare_sag4n_output_for_lh5(ak_array: ak.Array) -> ak.Array:
 def save_sag4n_output_to_lh5(
     output_data: dict,
     output_file: str | Path,
-    eunit: str = "keV",
+    eunit: str = "MeV",
     tunit: str = "ns",
 ) -> None:
     """Helper function to save the SaG4n generated events and integral yield to lh5 file."""
@@ -262,10 +262,14 @@ def save_sag4n_output_to_lh5(
 
     for field in ["px", "py", "pz", "ekin", "time"]:
         assert ak_array[field].ndim in (1, 2)
-        unit = eunit if field == "ekin" else "MeV"
-        unit = tunit if field == "time" else "ms"
+        attrs = {}
+        if field == "ekin":
+            attrs["units"] = eunit
+        elif field == "time":
+            attrs["units"] = tunit
+
         col = ak_array[field].to_numpy().astype(np.float64, copy=False)
-        kin_lh5.add_field(field, Array(col, attrs={"units": unit}))
+        kin_lh5.add_field(field, Array(col, attrs=attrs))
 
     for field in ["g4_pid", "n_part"]:
         col = ak_array[field].to_numpy().astype(np.int64, copy=False)
@@ -623,7 +627,7 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
 
     evt_data = sag4n_output["evts"]
     integral_yield = sag4n_output["integral_yield"]
-    msg = f"Integral yield: {integral_yield:.3e} (n/alpha)"
+    msg = f"Integral yield: {integral_yield:.3e} (n/decay)"
     log.info(msg)
 
     prepared_output = prepare_sag4n_output_for_lh5(evt_data)

@@ -193,12 +193,16 @@ def convert_output_kin(
 
     for field in ["px", "py", "pz", "ekin", "time"]:
         assert arr[field].ndim in (1, 2)
-        unit = eunit if field == "ekin" else "MeV"
-        unit = tunit if field == "time" else "ms"
+        attrs = {}
+        if field == "ekin":
+            attrs["units"] = eunit
+        elif field == "time":
+            attrs["units"] = tunit
+
         col = ak.flatten(arr[field]) if arr[field].ndim > 1 else arr[field]
         assert col.ndim == 1
         col = col.to_numpy().astype(np.float64, copy=False)
-        out.add_field(field, Array(col, attrs={"units": unit}))
+        out.add_field(field, Array(col, attrs=attrs))
 
     for field in ["g4_pid"]:
         assert arr[field].ndim in (1, 2)
