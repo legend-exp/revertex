@@ -1,7 +1,6 @@
-# Generator Wrappers
+# Generators
 
-This section documents generator-specific wrappers and their runtime
-requirements.
+This section documents specific on the generator.
 
 ```{toctree}
 :maxdepth: 1

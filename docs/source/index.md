@@ -44,6 +44,6 @@ of the vertices in chunks, and conversion to the correct output format.
 ```{toctree}
 :maxdepth: 1
 
-Generator wrappers <generators/index>
+Generator <generators/index>
 Package API reference <api/modules>
 ```
