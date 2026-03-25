@@ -14,7 +14,7 @@ spectra, such as SaG4n \[[1](#ref1)\] and NeuCBOT \[[2](#ref2)\]. This package
 offers wrappers for these tools for easy generation of ($\alpha$,n) neutron
 kinematics for remage simulations.
 
-> **Note:** At the moment only a single ($\alpha$,n) generator wrapper is
+> **Warning:** At the moment only a single ($\alpha$,n) generator wrapper is
 > available, which is a wrapper around the SaG4n tool. More generators such as
 > wrapper around NeuCBOT may be added in the future.
 
@@ -152,12 +152,14 @@ $ revertex alpha-n-kin \
 
 ## References
 
-(ref1)= [1] SaG4n github repository:
-[https://github.com/UIN-CIEMAT/SaG4n](https://github.com/UIN-CIEMAT/SaG4n)
-(ref2)= [2] NeuCBOT github repository:
-[https://github.com/shawest/neucbot](https://github.com/shawest/neucbot) (ref3)=
-[3] E. Mendoza et al., Neutron production induced by alpha-decay with Geant4,
-Nucl. Instrum. Methods A 960, 163659 (2020)
-[https://doi.org/10.1016/j.nima.2020.163659](https://doi.org/10.1016/j.nima.2020.163659)
-(ref4)= [4] Talys project page:
-[https://nds.iaea.org/talys/](https://nds.iaea.org/talys/)
+(ref1)=
+- [1] SaG4n github repository: [https://github.com/UIN-CIEMAT/SaG4n](https://github.com/UIN-CIEMAT/SaG4n)
+
+(ref2)=
+- [2] NeuCBOT github repository: [https://github.com/shawest/neucbot](https://github.com/shawest/neucbot)
+
+(ref3)=
+- [3] E. Mendoza et al., Neutron production induced by alpha-decay with Geant4, Nucl. Instrum. Methods A 960, 163659 (2020) [https://doi.org/10.1016/j.nima.2020.163659](https://doi.org/10.1016/j.nima.2020.163659)
+
+(ref4)=
+- [4] Talys project page: [https://nds.iaea.org/talys/](https://nds.iaea.org/talys/)
