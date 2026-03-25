@@ -176,7 +176,7 @@ def _detect_container_runtime(input_data: dict) -> str:
 def calculate_integral_yield(
     weights: np.ndarray, particle: np.ndarray, n_events: int, decay_chain: str
 ) -> float:
-    """Helper function to calculate the integral neutron yield per emitted alpha."""
+    """Helper function to calculate the integral neutron yield per decay of the source-chain initial isotope."""
     mask = particle == "neutron"
     return np.sum(weights[mask]) / n_events * ALPHAS_PER_DECAY.get(decay_chain, 1)
 
