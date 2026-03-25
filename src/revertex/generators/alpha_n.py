@@ -262,8 +262,8 @@ def save_sag4n_output_to_lh5(
 
     for field in ["px", "py", "pz", "ekin", "time"]:
         assert ak_array[field].ndim in (1, 2)
-        unit = eunit if field == "ekin" else ""
-        unit = tunit if field == "time" else ""
+        unit = eunit if field == "ekin" else "MeV"
+        unit = tunit if field == "time" else "ms"
         col = ak_array[field].to_numpy().astype(np.float64, copy=False)
         kin_lh5.add_field(field, Array(col, attrs={"units": unit}))
 
