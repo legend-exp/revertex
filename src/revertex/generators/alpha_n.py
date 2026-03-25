@@ -442,7 +442,7 @@ def run_sag4n(input_data: dict) -> None:
             )
             raise RuntimeError(msg) from exc
         except subprocess.CalledProcessError as exc:
-            details = (exc.output or exc.stdout or "").strip() or str(exc)
+            details = (exc.stderr or exc.stdout or "").strip() or str(exc)
             if (
                 "permission denied" in details.lower()
                 and "docker daemon socket" in details.lower()
