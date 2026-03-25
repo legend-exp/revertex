@@ -14,9 +14,13 @@ spectra, such as SaG4n \[[1](#ref1)\] and NeuCBOT \[[2](#ref2)\]. This package
 offers wrappers for these tools for easy generation of ($\alpha$,n) neutron
 kinematics for remage simulations.
 
-> **Warning:** At the moment only a single ($\alpha$,n) generator wrapper is
-> available, which is a wrapper around the SaG4n tool. More generators such as
-> wrapper around NeuCBOT may be added in the future.
+:::{warning}
+
+At the moment only a single ($\alpha$,n) generator wrapper is available, which
+is a wrapper around the SaG4n tool. More generators such as wrapper around
+NeuCBOT may be added in the future.
+
+:::
 
 ## SaG4n wrapper
 

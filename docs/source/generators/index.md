@@ -1,6 +1,6 @@
 # Generators
 
-This section documents specific on the generator.
+This section documents the generators.
 
 ```{toctree}
 :maxdepth: 1

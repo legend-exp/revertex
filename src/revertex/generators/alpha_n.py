@@ -7,9 +7,10 @@ import tempfile
 from pathlib import Path
 
 import awkward as ak
+import lh5
 import numpy as np
 import pyg4ometry as pyg4
-from lgdo import Array, Table, lh5, types
+from lgdo import Array, Table, types
 
 from revertex.utils import collect_isotopes
 
@@ -173,6 +174,90 @@ def _detect_container_runtime(input_data: dict) -> str:
     raise RuntimeError(msg)
 
 
+def _check_for_container_runtime_and_image(runtime: str, image: str) -> None:
+    """Helper function to check if the specified container runtime and image are available."""
+    if runtime == "docker":
+        try:
+            subprocess.run(
+                ["docker", "image", "inspect", image],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError:
+            msg = f"Docker image '{image}' not found. Please pull it with 'docker pull {image}'."
+            raise RuntimeError(msg) from None
+    elif runtime == "shifter":
+        try:
+            proc = subprocess.run(
+                ["shifterimg", "images"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            details = (exc.stderr or exc.stdout or str(exc)).strip()
+            msg = f"Failed to query Shifter images via 'shifterimg images': {details}"
+            raise RuntimeError(msg) from exc
+
+        candidates = {image}
+        if image.startswith("docker:"):
+            candidates.add(image.split("docker:", 1)[1])
+        else:
+            candidates.add(f"docker:{image}")
+
+        available = False
+        for line in proc.stdout.splitlines():
+            tokens = line.split()
+            if not tokens:
+                continue
+            if any(token in candidates for token in tokens):
+                available = True
+                break
+
+        if not available:
+            image_hint = image if image.startswith("docker:") else f"docker:{image}"
+            msg = (
+                f"Shifter image '{image}' is not available. "
+                f"Pull it first with 'shifterimg -v pull {image_hint}' and wait until status is READY."
+            )
+            raise RuntimeError(msg)
+    else:
+        msg = f"Unsupported container runtime '{runtime}'."
+        raise ValueError(msg)
+
+
+def _detect_container_runtime(input_data: dict) -> str:
+    """Select container runtime, preferring docker and falling back to shifter."""
+    requested_runtime = input_data.get("container_runtime")
+    if requested_runtime is not None:
+        runtime = str(requested_runtime).strip().lower()
+        if runtime not in {"docker", "shifter"}:
+            msg = (
+                "Unsupported container runtime "
+                f"'{requested_runtime}'. Supported runtimes are 'docker' and 'shifter'."
+            )
+            raise ValueError(msg)
+        if shutil.which(runtime) is None:
+            msg = (
+                f"Requested container runtime '{runtime}' was not found in PATH. "
+                "Please install it or choose a different runtime."
+            )
+            raise RuntimeError(msg)
+        return runtime
+
+    if shutil.which("docker") is not None:
+        return "docker"
+    if shutil.which("shifter") is not None:
+        return "shifter"
+
+    msg = (
+        "No supported container runtime found. Install Docker or Shifter and "
+        "ensure the executable is available in PATH."
+    )
+    raise RuntimeError(msg)
+
+
 def calculate_integral_yield(
     weights: np.ndarray, particle: np.ndarray, n_events: int, decay_chain: str
 ) -> float:
@@ -189,7 +274,11 @@ def read_sag4n_output(input_data: dict) -> dict:
         for line in f:
             if line.startswith("#") or line.strip().startswith("EventNumber"):
                 continue
-            evtid, particle, ekin, weight, x, y, z, px, py, pz = line.split()
+            try:
+                evtid, particle, ekin, weight, x, y, z, px, py, pz = line.split()
+            except ValueError as exc:
+                msg = f"Malformed line in SaG4n output: {line!r}"
+                raise ValueError(msg) from exc
             output["evtid"].append(int(evtid))
             output["particle"].append(particle)
             output["ekin"].append(float(ekin))
@@ -222,11 +311,11 @@ def prepare_sag4n_output_for_lh5(ak_array: ak.Array) -> ak.Array:
                 "ekin": np.array([], dtype=float),
                 "time": np.array([], dtype=float),
                 "g4_pid": np.array([], dtype=int),
-                "n_part": np.array([], dtype=float),
+                "n_part": np.array([], dtype=int),
             }
         )
     _, idx, counts = np.unique(ak_array["evtid"], return_counts=True, return_index=True)
-    n_part = np.zeros(len(ak_array["evtid"]))
+    n_part = np.zeros(len(ak_array["evtid"]), dtype=int)
     n_part[idx] = counts
     time = np.zeros(len(ak_array["evtid"]))
     g4_pid = np.zeros(len(ak_array["evtid"]), dtype=int)
@@ -261,7 +350,9 @@ def save_sag4n_output_to_lh5(
     kin_lh5 = Table(size=len(ak_array))
 
     for field in ["px", "py", "pz", "ekin", "time"]:
-        assert ak_array[field].ndim in (1, 2)
+        if ak_array[field].ndim not in (1, 2):
+            msg = f"Field '{field}' must be 1D or 2D, got {ak_array[field].ndim}D."
+            raise ValueError(msg)
         attrs = {}
         if field == "ekin":
             attrs["units"] = eunit
@@ -338,7 +429,6 @@ def generate_material_input(gdml_file: str | Path, part: str) -> str:
 
 def generate_sag4n_input_file(input_data: dict) -> str:
     """Helper function to generate valid SaG4n input files.
-
     Assumes input_data already has required fields: sub_material, source_chain, output_file_sag4n.
     Validation is the caller's responsibility.
     """
@@ -363,7 +453,7 @@ def generate_sag4n_input_file(input_data: dict) -> str:
 
 def run_sag4n(input_data: dict) -> None:
     """Wrapper for SaG4n."""
-    
+
     runtime = input_data["container_runtime"]
     image = input_data["container_image"]
     output_stem = input_data["sag4n_output_stem"]
@@ -382,8 +472,6 @@ def run_sag4n(input_data: dict) -> None:
         )
 
         # Build runtime-specific container command
-        runtime = input_data["container_runtime"]
-        image = input_data["container_image"]
         if runtime == "docker":
             cmd = [
                 "docker",
@@ -443,7 +531,7 @@ def run_sag4n(input_data: dict) -> None:
             )
             raise RuntimeError(msg) from exc
         except subprocess.CalledProcessError as exc:
-            details = (exc.output or exc.stdout or "").strip() or str(exc)
+            details = (exc.stderr or exc.stdout or "").strip() or str(exc)
             if (
                 "permission denied" in details.lower()
                 and "docker daemon socket" in details.lower()
@@ -486,20 +574,15 @@ def run_sag4n(input_data: dict) -> None:
 
 
 def generate_alpha_n_spectrum(input_data: dict) -> None:
-    """
-    Generate an (alpha, n) spectrum using SaG4n and save it in LH5 format.
+    """Generate an (alpha, n) spectrum using SaG4n and save it in LH5 format.
 
     There are several ways one can use this wrapper:
-
     1. pre-prepared `input_file_sag4n`:
         The user provides a path `input_file_sag4n` to a valid SaG4n input file. Then only `output_file` has to be provided.
-
     2. pre-prepared `sub_material` string:
         The user provides a `sub_material` string substituted into the template input file. In addition, the user has to provide `source_chain` and `output_file`.
-
     3. material read from a gdml file:
         The user provides a `gdml_file` and `part` name for a logical volume contained in the gdml file. The script will identify the material definition of this part and automatically generate the `sub_material`. In addition, the user has to provide `source_chain` and `output_file`.
-
     Additional optional input is:
     - `n_events`: Number of events to simulate in SaG4n. Default is 10 million.
     - `seed`: Random seed for the SaG4n simulation. Default is 1234567.
@@ -516,53 +599,10 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
 
     # Validate container image availability
     runtime = input_data["container_runtime"]
-    image = input_data["container_image"]
-    if runtime == "docker":
-        try:
-            subprocess.run(
-                ["docker", "image", "inspect", image],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError:
-            msg = f"Docker image '{image}' not found. Please pull it with 'docker pull {image}'."
-            raise RuntimeError(msg) from None
-    elif runtime == "shifter":
-        try:
-            proc = subprocess.run(
-                ["shifterimg", "images"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError as exc:
-            details = (exc.stderr or exc.stdout or str(exc)).strip()
-            msg = f"Failed to query Shifter images via 'shifterimg images': {details}"
-            raise RuntimeError(msg) from exc
-
-        candidates = {image}
-        if image.startswith("docker:"):
-            candidates.add(image.split("docker:", 1)[1])
-        else:
-            candidates.add(f"docker:{image}")
-
-        available = False
-        for line in proc.stdout.splitlines():
-            tokens = line.split()
-            if not tokens:
-                continue
-            if any(token in candidates for token in tokens):
-                available = True
-                break
-
-        if not available:
-            image_hint = image if image.startswith("docker:") else f"docker:{image}"
-            msg = (
-                f"Shifter image '{image}' is not available. "
-                f"Pull it first with 'shifterimg -v pull {image_hint}' and wait until status is READY."
-            )
-            raise RuntimeError(msg)
+    image = input_data.get(
+        "container_image", "moritzneuberger/sag4n-for-revertex:latest"
+    )
+    _check_for_container_runtime_and_image(runtime, image)
 
     if "output_file_sag4n" in input_data:
         input_data["output_file_sag4n"] = Path(input_data["output_file_sag4n"])
@@ -571,6 +611,7 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
         output_file = tmp_file.name
         tmp_file.close()
         input_data["output_file_sag4n"] = Path(output_file)
+        Path(output_file).unlink(missing_ok=True)
     input_data["sag4n_output_stem"] = input_data["output_file_sag4n"].stem
 
     if "input_file_sag4n" not in input_data:
@@ -591,7 +632,9 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
 
         input_file = generate_sag4n_input_file(input_data)
         input_data["input_file_sag4n"] = Path(input_file)
+        _generated_input_file = True
     else:
+        _generated_input_file = False
         # Extract the OUTPUTFILE stem from the input file early for validation
         input_text = Path(input_data["input_file_sag4n"]).read_text(encoding="utf-8")
         output_stem = None
@@ -624,6 +667,8 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
         input_data["sag4n_output_stem"] = output_stem
 
     run_sag4n(input_data)
+    if _generated_input_file:
+        Path(input_data["input_file_sag4n"]).unlink(missing_ok=True)
     sag4n_output = read_sag4n_output(input_data)
 
     evt_data = sag4n_output["evts"]

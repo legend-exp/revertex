@@ -232,7 +232,7 @@ def cli(args=None) -> None:
     )
     alpha_n_parser.add_argument(
         "--source-chain",
-        "-s",
+        "-c",
         type=str,
         default="",
         help="Name of the radiogenic chain to be used as alpha source. Options are [Th232, U238_lower, U238_upper]",
@@ -356,7 +356,7 @@ def cli(args=None) -> None:
     elif args.command == "alpha-n-kin":
         if args.seed == -1:
             random.seed()
-            args.seed = random.randint(0, 1e5)
+            args.seed = random.randint(0, 1000000)
 
         input_data = {
             "output_file": args.output_file,
@@ -364,6 +364,22 @@ def cli(args=None) -> None:
             "seed": args.seed,
             "container_image": args.container_image,
         }
+
+        pathway_sag4n = args.input_file_sag4n != ""
+        pathway_sub = args.sub_material != ""
+        pathway_gdml = args.gdml_file != "" or args.part != ""
+
+        if (
+            (pathway_sag4n and pathway_sub)
+            or (pathway_sag4n and pathway_gdml)
+            or (pathway_sub and pathway_gdml)
+        ):
+            msg = "You can only provide one of the following options to specify the target material for the alpha-n interaction: (1) a valid SaG4n input file in `input-file-sag4n`, (2) a substitution string for the material in `sub-material` (with `source-chain`) or (3) a gdml file `gdml-file` and name of a logical volume `part` from which to take the material information (with `source-chain`)."
+            raise RuntimeError(msg)
+
+        if (args.gdml_file != "") != (args.part != ""):
+            msg = "The `--gdml-file` and `--part` options must be provided together."
+            raise RuntimeError(msg)
 
         if args.container_runtime != "":
             input_data["container_runtime"] = args.container_runtime
