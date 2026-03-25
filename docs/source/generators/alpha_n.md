@@ -153,13 +153,22 @@ $ revertex alpha-n-kin \
 ## References
 
 (ref1)=
-- [1] SaG4n github repository: [https://github.com/UIN-CIEMAT/SaG4n](https://github.com/UIN-CIEMAT/SaG4n)
+
+- [1] SaG4n github repository:
+  [https://github.com/UIN-CIEMAT/SaG4n](https://github.com/UIN-CIEMAT/SaG4n)
 
 (ref2)=
-- [2] NeuCBOT github repository: [https://github.com/shawest/neucbot](https://github.com/shawest/neucbot)
+
+- [2] NeuCBOT github repository:
+  [https://github.com/shawest/neucbot](https://github.com/shawest/neucbot)
 
 (ref3)=
-- [3] E. Mendoza et al., Neutron production induced by alpha-decay with Geant4, Nucl. Instrum. Methods A 960, 163659 (2020) [https://doi.org/10.1016/j.nima.2020.163659](https://doi.org/10.1016/j.nima.2020.163659)
+
+- [3] E. Mendoza et al., Neutron production induced by alpha-decay with Geant4,
+  Nucl. Instrum. Methods A 960, 163659 (2020)
+  [https://doi.org/10.1016/j.nima.2020.163659](https://doi.org/10.1016/j.nima.2020.163659)
 
 (ref4)=
-- [4] Talys project page: [https://nds.iaea.org/talys/](https://nds.iaea.org/talys/)
+
+- [4] Talys project page:
+  [https://nds.iaea.org/talys/](https://nds.iaea.org/talys/)
