@@ -75,8 +75,8 @@ def test_collect_isotopes(test_gdml):
     assert len(isotopes) == 2
     assert 32074 in isotopes
     assert 32076 in isotopes
-    assert np.isclose(isotopes[32074], 0.245027909999)
-    assert np.isclose(isotopes[32076], 0.754972090001)
+    assert np.isclose(isotopes[32074], 0.25)
+    assert np.isclose(isotopes[32076], 0.75)
 
 
 def test_collect_isotopes_resolves_string_component_names():

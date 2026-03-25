@@ -22,8 +22,8 @@ def test_generate_material_input(test_gdml):
     assert "MATERIAL 1 EnrichedGermanium0.750" in material_input
     assert " 5.5281676971 " in material_input
     assert " 2\n" in material_input
-    assert "32074 -0.245027909999" in material_input
-    assert "32076 -0.754972090001" in material_input
+    assert "32074 0.25" in material_input
+    assert "32076 0.75" in material_input
     assert "ENDMATERIAL" in material_input
 
 
@@ -50,18 +50,18 @@ def test_generate_material_input_for_element_only_material(tmp_path):
     material_input = generate_material_input(gdml_file, "part")
 
     assert "MATERIAL 1 liquid_argon 1.39 3" in material_input
-    assert "18036 -0.00302972781022" in material_input
-    assert "18038 -0.000600596039154" in material_input
-    assert "18040 -0.996369676151" in material_input
+    assert "18036 0.003365" in material_input
+    assert "18038 0.000632" in material_input
+    assert "18040 0.996003" in material_input
 
 
 def test_generate_material_input_for_nist_material(test_gdml):
     material_input = generate_material_input(test_gdml, "LAr_l")
 
     assert "MATERIAL 1 G4_lAr 1.396 3" in material_input
-    assert "18036 -0.00302972781022" in material_input
-    assert "18038 -0.000600596039154" in material_input
-    assert "18040 -0.996369676151" in material_input
+    assert "18036 0.003365" in material_input
+    assert "18038 0.000632" in material_input
+    assert "18040 0.996003" in material_input
 
 
 def test_generate_material_input_for_natoms_material(tmp_path):
@@ -100,9 +100,9 @@ def test_generate_material_input_for_natoms_material(tmp_path):
     material_input = generate_material_input(gdml_file, "part_natoms")
 
     assert "MATERIAL 1 water_nat 1 3" in material_input
-    assert "1001 -0.111900652759" in material_input
-    assert "1002 -2.57203420878e-05" in material_input
-    assert "8016 -0.888073626899" in material_input
+    assert "1001 0.66659" in material_input
+    assert "1002 7.66666666667e-05" in material_input
+    assert "8016 0.333333333333" in material_input
 
 
 def test_generate_sag4n_input_file(test_gdml):

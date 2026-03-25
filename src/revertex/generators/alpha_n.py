@@ -317,12 +317,12 @@ def generate_material_input(gdml_file: str | Path, part: str) -> str:
         pyg4,
     )
 
-    total_mass_fraction = float(np.sum(list(isotopes.values())))
+    total_atomic_fraction = float(np.sum(list(isotopes.values())))
     isotope_lines = []
-    for zaid, mass_fraction in sorted(isotopes.items()):
+    for zaid, atomic_fraction in sorted(isotopes.items()):
         isotope_lines.append(
-            f"{zaid} -{mass_fraction / total_mass_fraction:.12g}"
-        )  # negative sign for mass fraction in sag4n
+            f"{zaid} {atomic_fraction / total_atomic_fraction:.12g}"
+        )  # atomic fraction when specifying isotopes in sag4n
 
     return SAG4N_MATERIAL_TEMPLATE.format(
         sub_name=material.name,

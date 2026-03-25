@@ -164,10 +164,10 @@ def collect_isotopes(
     normalize_output: bool = True,
     _is_recursive_call: bool = False,
 ) -> None:
-    """Recursively collect isotopes and their mass fractions for a given material component.
+    """Recursively collect isotopes and their atomic fractions for a given material component.
 
     This function handles components defined as isotopes, elements, or compounds in pyg4ometry.
-    For isotopes, it directly adds the ZAID and mass fraction to the `isotopes` dictionary (used as pid in SaG4n).
+    For isotopes, it directly adds the ZAID and atomic fraction to the `isotopes` dictionary (used as pid in SaG4n).
     For elements, it looks up the natural isotope abundances using the NIST registry.
     For compounds, it recursively processes the sub-components.
     """
@@ -184,7 +184,7 @@ def collect_isotopes(
                 return material_dict[component]
         return component
 
-    def _component_mass_weight(
+    def _component_atomic_weight(
         component,
         comp_value,
         comp_kind: str,
@@ -196,14 +196,18 @@ def collect_isotopes(
         kind = comp_kind.lower()
 
         if kind == "massfraction":
-            return value
-        if kind in {"abundance", "natoms"}:
-            return value * _component_reference_mass(
+            reference_mass = _component_reference_mass(
                 component,
                 nist_registry,
                 nist_element_z_to_name,
                 pyg4,
             )
+            if reference_mass <= 0:
+                msg = "Material component fractions are not valid."
+                raise ValueError(msg)
+            return value / reference_mass
+        if kind in {"abundance", "natoms"}:
+            return value
         msg = f"Unsupported material component definition kind '{comp_kind}'."
         raise ValueError(msg)
 
@@ -295,7 +299,7 @@ def collect_isotopes(
         raise ValueError(msg)
 
     comp_values = [
-        _component_mass_weight(
+        _component_atomic_weight(
             sub_component,
             comp_value,
             comp_kind,
@@ -325,9 +329,9 @@ def collect_isotopes(
         )
 
     if normalize_output and not _is_recursive_call:
-        total_mass = float(np.sum(list(isotopes.values())))
-        if total_mass <= 0:
+        total_atoms = float(np.sum(list(isotopes.values())))
+        if total_atoms <= 0:
             msg = "Material component fractions are not valid."
             raise ValueError(msg)
         for zaid in list(isotopes.keys()):
-            isotopes[zaid] = isotopes[zaid] / total_mass
+            isotopes[zaid] = isotopes[zaid] / total_atoms
