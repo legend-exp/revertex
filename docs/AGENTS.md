@@ -1,57 +1,26 @@
----
-name: revertex-docs-agent
-description:
-  Expert technical writer for revertex documentation using Sphinx and MyST
----
+# AGENTS.md — Documentation
 
-# AGENTS.md — Documentation Conventions
+Sphinx-based. Build: `cd docs && make`. Config in `docs/source/conf.py`. See
+`Makefile` for other useful targets.
 
-You are an expert technical writer managing the `docs/` directory.
+## Conventions
 
-## Persona & Role
+- Source in `docs/source/`
+- Pages written in Markdown
+- Colon fences (`:::`) for sphinx directives like admonitions. Always add an
+  empty line after the open and before the close of a `:::` block, otherwise
+  `prettier` will re-wrap and break rendering
+- Always enable code block highlighting. Use `console` for shell commands
+  (prompt delimiter `>`)
+- Document each function and Snakemake rule in its docstring; higher-level docs
+  go in the user manual
+- All new pages must appear in a toctree — orphan pages cause build warnings
+- API reference is auto-generated; do not write it by hand
 
-- **Role:** You write clear, accessible documentation for developers and
-  physicists using Sphinx + MyST.
-- **Goal:** Document generators, keep CLI instructions up to date, and prevent
-  CI build warnings.
+## Python docstring conventions
 
-## Common commands
-
-- **Build docs:** `cd docs && make html`
-- **Clear cache:** `cd docs && make clean`
-- **Lint markdown:** `pre-commit run end-of-file-fix` (or equivalent in repo)
-
-## Conventions & Examples
-
-- **CRITICAL:** Use `(target_name)=` for MyST targets.
-- **CRITICAL:** Always leave a blank line above AND below the target.
-
-**✅ Good - Proper MyST anchor spacing**
-
-```markdown
-Here is the previous paragraph text.
-
-(generic-target-name)=
-
-## Section or Item Header
-
-Link to the [Section](#generic-target-name) or [[1]](#generic-target-name).
-```
-
-**❌ Bad - Missing blank lines (causes myst.xref_missing Sphinx crash)**
-
-```markdown
-Here is the previous paragraph text. (generic-target-name)=
-
-## Section or Item Header
-
-Link to the [Section](#generic-target-name)
-```
-
-## Boundaries
-
-- ✅ **Always do:** Run `make html` or ensure zero warnings logically when
-  modifying markdown referencing.
-- ⚠️ **Ask first:** Before significantly changing the `index.md` toctree.
-- 🚫 **Never do:** Use raw HTML anchors `<a id="xxx"></a>` instead of MyST
-  targets.
+- NumPy-style docstrings
+- Wrap prose at Ruff's default line length; never wrap the summary line
+- Reference Python methods with Sphinx RST cross-reference roles
+- Cross-reference methods from other packages via Intersphinx (mappings in
+  `docs/source/conf.py`)
