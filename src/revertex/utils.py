@@ -55,10 +55,10 @@ def read_input_beta_csv(path: str, **kwargs) -> tuple[np.ndarray, np.ndarray]:
     return np.genfromtxt(path, **kwargs).T[0], np.genfromtxt(path, **kwargs).T[1]
 
 
-def find_mother_physical_volume(
+def find_mother_physical_volumes(
     pv: geant4.PhysicalVolume, registry: geant4.Registry
-) -> list:
-    """Find the mother physical volume."""
+) -> list[geant4.PhysicalVolume]:
+    """Find the mother physical volumes."""
     mothers = []
 
     for other_pv in registry.physicalVolumeDict.values():
@@ -79,7 +79,7 @@ def _get_position(pv_name: str, reg: geant4.Registry) -> list:
     n_mothers = 1
 
     while n_mothers > 0:
-        mothers = find_mother_physical_volume(pv, reg)
+        mothers = find_mother_physical_volumes(pv, reg)
         n_mothers = len(mothers)
 
         if len(mothers) > 1:

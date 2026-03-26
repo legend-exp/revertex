@@ -54,7 +54,10 @@ def test_position():
 
     reg = pyg4ometry.gdml.Reader(gdml).getRegistry()
 
-    print(utils._get_position("B99000A", reg))
+    # B99000A is placed at (-5, 0, -3) cm in LAr, which is at the origin
+    assert utils._get_position("B99000A", reg) == [-50.0, 0.0, -30.0]
+    # V99000A is placed at (5, 0, -3) cm in LAr, which is at the origin
+    assert utils._get_position("V99000A", reg) == [50.0, 0.0, -30.0]
 
 
 def test_borehole(test_data_configs):
