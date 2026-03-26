@@ -48,6 +48,18 @@ def test_hpges():
     assert utils.get_surface_weights(hpges, "nplus")[0] == 1.0
 
 
+def test_position():
+    test_file_dir = Path(__file__).parent
+    gdml = f"{test_file_dir}/test_files/geom.gdml"
+
+    reg = pyg4ometry.gdml.Reader(gdml).getRegistry()
+
+    # B99000A is placed at (-5, 0, -3) cm in LAr, which is at the origin
+    assert utils._get_position("B99000A", reg) == [-50.0, 0.0, -30.0]
+    # V99000A is placed at (5, 0, -3) cm in LAr, which is at the origin
+    assert utils._get_position("V99000A", reg) == [50.0, 0.0, -30.0]
+
+
 def test_borehole(test_data_configs):
     reg = geant4.Registry()
     hpge_IC = pygeomhpges.make_hpge(test_data_configs + "/V99000A.yaml", registry=reg)
