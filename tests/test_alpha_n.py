@@ -165,6 +165,21 @@ def test_cli_fails_when_more_than_one_pathway_specified():
         cli(args)
 
 
+def test_container_runtime_docker_available():
+    runtime = alpha_n._detect_container_runtime({})
+    assert runtime == "docker"
+
+
+def test_container_runtime_and_image_docker():
+    # This test assumes that 'docker' is available in the test environment. If not, it should be skipped or adapted.
+    try:
+        alpha_n._check_for_container_runtime_and_image(
+            "docker", "moritzneuberger/sag4n-for-revertex:latest"
+        )
+    except RuntimeError:
+        pytest.skip("Docker is not available in the test environment.")
+
+
 @pytest.mark.parametrize(
     ("which_map", "input_data", "expected_runtime", "error_match"),
     [
@@ -183,21 +198,6 @@ def test_cli_fails_when_more_than_one_pathway_specified():
         ),
     ],
 )
-def test_container_runtime_docker_available():
-    runtime = alpha_n._detect_container_runtime({})
-    assert runtime == "docker"
-
-
-def test_container_runtime_and_image_docker():
-    # This test assumes that 'docker' is available in the test environment. If not, it should be skipped or adapted.
-    try:
-        alpha_n._check_for_container_runtime_and_image(
-            "docker", "moritzneuberger/sag4n-for-revertex:latest"
-        )
-    except RuntimeError:
-        pytest.skip("Docker is not available in the test environment.")
-
-
 def test_container_run_sag4n_raises_runtime_error_when_container_executable_missing(
     monkeypatch, tmp_path
 ):

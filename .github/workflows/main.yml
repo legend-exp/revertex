@@ -40,12 +40,10 @@ jobs:
         run: |
           python -m pip install --upgrade pip wheel setuptools
           python -m pip install --upgrade .[test]
-      - name: Install docker
+      - name: Pull required container image
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
-          sudo apt-get update
-          sudo apt-get install -y docker.io
-          docker pull moritzneuberger/sag4n-for-revertex:latest
+          docker pull ghcr.io/mneuberger/sag4n:latest
       - name: Run unit tests
         run: |
           python -m pytest
