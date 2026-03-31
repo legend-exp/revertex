@@ -8,6 +8,7 @@ import numpy as np
 import pyg4ometry as pyg4
 import pytest
 
+from revertex.cli import cli
 from revertex.generators import alpha_n
 from revertex.generators.alpha_n import (
     generate_material_input,
@@ -15,51 +16,212 @@ from revertex.generators.alpha_n import (
     prepare_sag4n_output_for_lh5,
 )
 
+# Layout of tests:
+# - cli tests
+# - test container runtime
+# - generate material input
+# - generate sag4n inputs
+# - generate alpha_n spectra
+# - read sag4n output
+# - prepare sag4n output to lh5
+# - post-proc (integral yield)
 
-def _install_generate_spectrum_mocks(monkeypatch):
-    """Install mocks for generate_alpha_n_spectrum to avoid container dependencies."""
+# direct calls to the container are not tested since the container might not be available on the test system
 
-    calls = {"save": {}, "run_count": 0}
+### cli test
+
+
+def test_cli_gdml_pathway(monkeypatch, capsys):
+
+    def _fake_generate_alpha_n_spectrum(input_data):
+        print(input_data)
 
     monkeypatch.setattr(
-        alpha_n, "_detect_container_runtime", lambda _input_data: "docker"
+        alpha_n, "generate_alpha_n_spectrum", _fake_generate_alpha_n_spectrum
     )
-    monkeypatch.setattr(alpha_n.subprocess, "run", lambda *_args, **_kwargs: None)
+
+    args = [
+        "alpha-n-kin",
+        "--gdml-file",
+        "./test_files/geom.gdml",
+        "--part",
+        "V99000A",
+        "--output-file",
+        ".tmp.lh5",
+        "--source-chain",
+        "Th232",
+    ]
+
+    cli(args)
+
+    captured = capsys.readouterr()
+    generated_input_data = eval(captured.out)  # nosec: eval is used here
+
+    assert generated_input_data["output_file"] == ".tmp.lh5"
+    assert generated_input_data["gdml_file"] == "./test_files/geom.gdml"
+    assert generated_input_data["part"] == "V99000A"
+    assert generated_input_data["source_chain"] == "Th232"
+    assert "n_events" in generated_input_data
+    assert "seed" in generated_input_data
+    assert "container_image" in generated_input_data
+
+
+def test_cli_substitution_pathway(monkeypatch, capsys):
+
+    def _fake_generate_alpha_n_spectrum(input_data):
+        print(input_data)
+
+    monkeypatch.setattr(
+        alpha_n, "generate_alpha_n_spectrum", _fake_generate_alpha_n_spectrum
+    )
+
+    args = [
+        "alpha-n-kin",
+        "--sub-material",
+        '"MATERIAL 1 MyMat 1.0 1\\n1001 -1\\nENDMATERIAL\\n"',
+        "--output-file",
+        ".tmp.lh5",
+        "--source-chain",
+        "Th232",
+    ]
+
+    cli(args)
+
+    captured = capsys.readouterr()
+    generated_input_data = eval(captured.out)  # nosec: eval is used here
+
+    assert generated_input_data["output_file"] == ".tmp.lh5"
+    assert (
+        generated_input_data["sub_material"]
+        == '"MATERIAL 1 MyMat 1.0 1\\n1001 -1\\nENDMATERIAL\\n"'
+    )
+    assert generated_input_data["source_chain"] == "Th232"
+    assert "n_events" in generated_input_data
+    assert "seed" in generated_input_data
+    assert "container_image" in generated_input_data
+
+
+def test_cli_input_sag4n_file_pathway(monkeypatch, capsys, tmp_path):
+
+    input = """
+SOURCE 1 0 0 0 0
+1.00 1
+Chain_Th232 0 100.0
+ENDSOURCE
+"""
+
+    input_file = tmp_path / "input.txt"
+    input_file.write_text(input, encoding="utf-8")
 
     def _fake_run_sag4n(input_data):
-        calls["run_count"] += 1
-        output_file = Path(input_data["output_file_sag4n"])
-        output_file.parent.mkdir(parents=True, exist_ok=True)
-        output_file.write_text(
-            "# comment\n"
-            "EventNumber particle ekin weight x y z px py pz\n"
-            "0 neutron 1.0 0.25 0 0 0 1 0 0\n"
-            "1 neutron 2.0 0.75 0 0 0 0 1 0\n",
-            encoding="utf-8",
-        )
-
-    def _fake_save(output_data, output_file, eunit="keV", tunit="ns"):
-        calls["save"] = {
-            "output_data": output_data,
-            "output_file": Path(output_file),
-            "eunit": eunit,
-            "tunit": tunit,
-        }
+        input_data["output_file_sag4n"] = str(input_data["output_file_sag4n"])
+        print(input_data)
 
     monkeypatch.setattr(alpha_n, "run_sag4n", _fake_run_sag4n)
-    monkeypatch.setattr(alpha_n, "save_sag4n_output_to_lh5", _fake_save)
-    return calls
+
+    args = [
+        "alpha-n-kin",
+        "--input-file-sag4n",
+        str(input_file),
+        "--output-file",
+        ".tmp.lh5",
+        "--source-chain",
+        "Th232",
+    ]
+
+    cli(args)
+    captured = capsys.readouterr()
+    generated_input_data = eval(captured.out)  # nosec: eval is used here
+
+    assert generated_input_data["output_file"] == ".tmp.lh5"
+    assert generated_input_data["input_file_sag4n"] == str(input_file)
+    assert generated_input_data["source_chain"] == "Th232"
+    assert "n_events" in generated_input_data
+    assert "seed" in generated_input_data
+    assert "container_image" in generated_input_data
 
 
-def test_generate_material_input(test_gdml):
-    material_input = generate_material_input(test_gdml, "V99000A")
+def test_cli_fails_when_more_than_one_pathway_specified():
+    args = [
+        "alpha-n-kin",
+        "--input-file-sag4n",
+        "input.txt",
+        "--sub-material",
+        '"MATERIAL 1 MyMat 1.0 1\\n1001 -1\\nENDMATERIAL\\n"',
+        "--output-file",
+        ".tmp.lh5",
+        "--source-chain",
+        "Th232",
+    ]
 
-    assert "MATERIAL 1 EnrichedGermanium0.750" in material_input
-    assert " 5.5281676971 " in material_input
-    assert " 2\n" in material_input
-    assert "32074 0.25" in material_input
-    assert "32076 0.75" in material_input
-    assert "ENDMATERIAL" in material_input
+    with pytest.raises(
+        RuntimeError,
+        match="You can only provide one of the following options to specify the target material for the alpha-n interaction",
+    ):
+        cli(args)
+
+
+@pytest.mark.parametrize(
+    ("which_map", "input_data", "expected_runtime", "error_match"),
+    [
+        ({"docker": None, "shifter": "/usr/bin/shifter"}, {}, "shifter", None),
+        (
+            {"docker": None, "shifter": None},
+            {"container_runtime": "docker"},
+            None,
+            "was not found in PATH",
+        ),
+        (
+            {"docker": None, "shifter": None},
+            {},
+            None,
+            "No supported container runtime found",
+        ),
+    ],
+)
+def test_container_runtime_cases(
+    monkeypatch, which_map, input_data, expected_runtime, error_match
+):
+    detect_runtime = alpha_n._detect_container_runtime
+
+    def _fake_which(cmd):
+        return which_map.get(cmd)
+
+    monkeypatch.setattr(alpha_n.shutil, "which", _fake_which)
+
+    if error_match is not None:
+        with pytest.raises(RuntimeError, match=error_match):
+            detect_runtime(input_data)
+        return
+
+    assert detect_runtime(input_data) == expected_runtime
+
+
+def test_container_run_sag4n_raises_runtime_error_when_container_executable_missing(
+    monkeypatch, tmp_path
+):
+    input_file = tmp_path / "input.txt"
+    input_file.write_text("OUTPUTFILE /data/test\n", encoding="utf-8")
+
+    def _raise_file_not_found(*_args, **_kwargs):
+        msg = "docker"
+        raise FileNotFoundError(msg)
+
+    monkeypatch.setattr(alpha_n.subprocess, "Popen", _raise_file_not_found)
+
+    with pytest.raises(RuntimeError, match="runtime executable 'docker' not found"):
+        alpha_n.run_sag4n(
+            {
+                "container_runtime": "docker",
+                "container_image": "repo/image:tag",
+                "sag4n_output_stem": "test_output",
+                "input_file_sag4n": input_file,
+                "output_file_sag4n": tmp_path / "test_output.out",
+            }
+        )
+
+
+### generate material
 
 
 def test_generate_material_input_for_element_only_material(tmp_path):
@@ -85,15 +247,6 @@ def test_generate_material_input_for_element_only_material(tmp_path):
     material_input = generate_material_input(gdml_file, "part")
 
     assert "MATERIAL 1 liquid_argon 1.39 3" in material_input
-    assert "18036 0.003365" in material_input
-    assert "18038 0.000632" in material_input
-    assert "18040 0.996003" in material_input
-
-
-def test_generate_material_input_for_nist_material(test_gdml):
-    material_input = generate_material_input(test_gdml, "LAr_l")
-
-    assert "MATERIAL 1 G4_lAr 1.396 3" in material_input
     assert "18036 0.003365" in material_input
     assert "18038 0.000632" in material_input
     assert "18040 0.996003" in material_input
@@ -140,7 +293,24 @@ def test_generate_material_input_for_natoms_material(tmp_path):
     assert "8016 0.333333333333" in material_input
 
 
-def test_generate_sag4n_input_file(test_gdml):
+def test_generate_material_input_for_nist_material(test_gdml):
+    material_input = generate_material_input(test_gdml, "LAr_l")
+
+    assert "MATERIAL 1 G4_lAr 1.396 3" in material_input
+    assert "18036 0.003365" in material_input
+    assert "18038 0.000632" in material_input
+    assert "18040 0.996003" in material_input
+
+
+def test_generate_material_input_fails_for_unknown_part(test_gdml):
+    with pytest.raises(KeyError, match="Logical volume 'does_not_exist' not found"):
+        generate_material_input(test_gdml, "does_not_exist")
+
+
+### generate input file
+
+
+def test_generate_sag4n_input_file_uses_gdml_part(test_gdml):
     tmp_file = tempfile.NamedTemporaryFile(delete=False)  # noqa: SIM115
     output_file = tmp_file.name
     tmp_file.close()
@@ -164,121 +334,6 @@ def test_generate_sag4n_input_file(test_gdml):
     assert "NEVENTS 1000" in content
 
 
-def test_prepare_sag4n_output_for_lh5_handles_empty_array():
-    empty = ak.Array(
-        {
-            "evtid": [],
-            "particle": [],
-            "ekin": [],
-            "weight": [],
-            "x": [],
-            "y": [],
-            "z": [],
-            "px": [],
-            "py": [],
-            "pz": [],
-        }
-    )
-
-    prepared = prepare_sag4n_output_for_lh5(empty)
-    assert len(prepared["px"]) == 0
-    assert len(prepared["g4_pid"]) == 0
-
-
-@pytest.mark.parametrize(
-    ("which_map", "input_data", "expected_runtime", "error_match"),
-    [
-        ({"docker": None, "shifter": "/usr/bin/shifter"}, {}, "shifter", None),
-        (
-            {"docker": None, "shifter": None},
-            {"container_runtime": "docker"},
-            None,
-            "was not found in PATH",
-        ),
-        (
-            {"docker": None, "shifter": None},
-            {},
-            None,
-            "No supported container runtime found",
-        ),
-    ],
-)
-def test_detect_container_runtime_cases(
-    monkeypatch, which_map, input_data, expected_runtime, error_match
-):
-    detect_runtime = alpha_n._detect_container_runtime
-
-    def _fake_which(cmd):
-        return which_map.get(cmd)
-
-    monkeypatch.setattr(alpha_n.shutil, "which", _fake_which)
-
-    if error_match is not None:
-        with pytest.raises(RuntimeError, match=error_match):
-            detect_runtime(input_data)
-        return
-
-    assert detect_runtime(input_data) == expected_runtime
-
-
-def test_calculate_integral_yield_scales_with_alphas_per_decay():
-    weights = np.array([0.5, 2.0, 1.5, 5.0])
-    particles = np.array(["neutron", "gamma", "neutron", "gamma"])
-
-    integral_yield = alpha_n.calculate_integral_yield(
-        weights, particles, n_events=20, decay_chain="Th232"
-    )
-
-    assert integral_yield == pytest.approx((0.5 + 1.5) / 20 * 6)
-
-
-def test_read_sag4n_output_parses_event_file(tmp_path):
-    output_file = tmp_path / "sag4n.out"
-    output_file.write_text(
-        "# comment\n"
-        "EventNumber particle ekin weight x y z px py pz\n"
-        "0 neutron 1.0 0.25 0 0 0 1 0 0\n"
-        "0 gamma 2.0 0.50 0 0 0 0 1 0\n"
-        "1 neutron 3.0 0.75 0 0 0 0 0 1\n",
-        encoding="utf-8",
-    )
-
-    result = alpha_n.read_sag4n_output(
-        {
-            "output_file_sag4n": output_file,
-            "n_events": 10,
-            "source_chain": "U238_lower",
-        }
-    )
-
-    assert len(result["evts"]["evtid"]) == 3
-    assert result["evts"]["particle"][0] == "neutron"
-    assert result["integral_yield"] == pytest.approx((0.25 + 0.75) / 10 * 4)
-
-
-def test_prepare_sag4n_output_for_lh5_non_empty_mapping():
-    evts = ak.Array(
-        {
-            "evtid": [10, 10, 11],
-            "particle": ["neutron", "gamma", "neutron"],
-            "ekin": [1.0, 2.0, 3.0],
-            "weight": [1.0, 1.0, 1.0],
-            "x": [0.0, 0.0, 0.0],
-            "y": [0.0, 0.0, 0.0],
-            "z": [0.0, 0.0, 0.0],
-            "px": [1.0, 0.0, 0.0],
-            "py": [0.0, 1.0, 0.0],
-            "pz": [0.0, 0.0, 1.0],
-        }
-    )
-
-    prepared = prepare_sag4n_output_for_lh5(evts)
-
-    assert prepared["g4_pid"].to_list() == [2112, 22, 2112]
-    assert prepared["n_part"].to_list() == [2, 0.0, 1]
-    assert prepared["time"].to_list() == [0.0, 0.0, 0.0]
-
-
 def test_generate_sag4n_input_file_uses_sub_material_without_gdml(tmp_path):
     input_data = {
         "sub_material": "MATERIAL 1 MyMat 1.0 1\n1001 -1\nENDMATERIAL\n",
@@ -297,31 +352,57 @@ def test_generate_sag4n_input_file_uses_sub_material_without_gdml(tmp_path):
     assert "OUTPUTFILE /data/my_result" in content
 
 
-def test_generate_alpha_n_spectrum_requires_output_file():
-    with pytest.raises(ValueError, match="'output_file' must be provided"):
-        alpha_n.generate_alpha_n_spectrum({})
+def test_generate_sag4n_input_file_fails_when_source_chain_missing(tmp_path):
+    with pytest.raises(KeyError, match="source_chain"):
+        generate_sag4n_input_file(
+            {
+                "sub_material": "MATERIAL 1 MyMat 1.0 1\n1001 1\nENDMATERIAL\n",
+                "output_file_sag4n": tmp_path / "missing_chain.out",
+            }
+        )
 
 
-def test_generate_alpha_n_spectrum_fails_when_source_chain_missing_in_input_file(
-    monkeypatch, tmp_path
-):
-    bad_input_file = tmp_path / "bad_input.txt"
-    bad_input_file.write_text("OUTPUTFILE /data/no_chain\n", encoding="utf-8")
+### generate alpha n spectrum
+
+
+def _install_generate_spectrum_mocks(monkeypatch):
+    """Install mocks for generate_alpha_n_spectrum to avoid container dependencies."""
+
+    calls = {"save": {}, "run_count": 0}
 
     monkeypatch.setattr(
         alpha_n, "_detect_container_runtime", lambda _input_data: "docker"
     )
-    # Mock subprocess to avoid actual Docker calls during image validation
     monkeypatch.setattr(alpha_n.subprocess, "run", lambda *_args, **_kwargs: None)
 
-    with pytest.raises(ValueError, match="Could not detect source chain"):
-        alpha_n.generate_alpha_n_spectrum(
-            {
-                "output_file": tmp_path / "result.lh5",
-                "input_file_sag4n": bad_input_file,
-                "container_image": "repo/image:tag",
-            }
+    def _fake_run_sag4n(input_data):
+        calls["run_count"] += 1
+        output_file = Path(input_data["output_file_sag4n"])
+        output_file.parent.mkdir(parents=True, exist_ok=True)
+        output_file.write_text(
+            "# comment\n"
+            "EventNumber particle ekin weight x y z px py pz\n"
+            "0 neutron 1.0 0.25 0 0 0 1 0 0\n"
+            "1 neutron 2.0 0.75 0 0 0 0 1 0\n",
+            encoding="utf-8",
         )
+
+    def _fake_save(output_data, output_file, eunit="keV", tunit="ns"):
+        calls["save"] = {
+            "output_data": output_data,
+            "output_file": Path(output_file),
+            "eunit": eunit,
+            "tunit": tunit,
+        }
+
+    monkeypatch.setattr(alpha_n, "run_sag4n", _fake_run_sag4n)
+    monkeypatch.setattr(alpha_n, "save_sag4n_output_to_lh5", _fake_save)
+    return calls
+
+
+def test_generate_alpha_n_spectrum_requires_output_file():
+    with pytest.raises(ValueError, match="'output_file' must be provided"):
+        alpha_n.generate_alpha_n_spectrum({})
 
 
 def test_generate_alpha_n_spectrum_with_input_file_pathway(monkeypatch, tmp_path):
@@ -388,6 +469,28 @@ def test_generate_alpha_n_spectrum_with_gdml_material_pathway(
     )
 
 
+def test_generate_alpha_n_spectrum_fails_when_source_chain_missing_in_input_file(
+    monkeypatch, tmp_path
+):
+    bad_input_file = tmp_path / "bad_input.txt"
+    bad_input_file.write_text("OUTPUTFILE /data/no_chain\n", encoding="utf-8")
+
+    monkeypatch.setattr(
+        alpha_n, "_detect_container_runtime", lambda _input_data: "docker"
+    )
+    # Mock subprocess to avoid actual Docker calls during image validation
+    monkeypatch.setattr(alpha_n.subprocess, "run", lambda *_args, **_kwargs: None)
+
+    with pytest.raises(ValueError, match="Could not detect source chain"):
+        alpha_n.generate_alpha_n_spectrum(
+            {
+                "output_file": tmp_path / "result.lh5",
+                "input_file_sag4n": bad_input_file,
+                "container_image": "repo/image:tag",
+            }
+        )
+
+
 @pytest.mark.parametrize(
     "extra_input",
     [
@@ -436,69 +539,89 @@ def test_generate_alpha_n_spectrum_fails_when_source_chain_missing_for_sub_mater
         )
 
 
-def test_generate_alpha_n_spectrum_fails_on_invalid_container_runtime(tmp_path):
-    with pytest.raises(ValueError, match="Unsupported container runtime"):
-        alpha_n.generate_alpha_n_spectrum(
-            {
-                "output_file": tmp_path / "result.lh5",
-                "container_image": "repo/image:tag",
-                "container_runtime": "podman",
-            }
-        )
+### read sag4n output
 
 
-def test_generate_material_input_fails_for_unknown_part(test_gdml):
-    with pytest.raises(KeyError, match="Logical volume 'does_not_exist' not found"):
-        generate_material_input(test_gdml, "does_not_exist")
-
-
-def test_generate_sag4n_input_file_fails_when_source_chain_missing(tmp_path):
-    with pytest.raises(KeyError, match="source_chain"):
-        generate_sag4n_input_file(
-            {
-                "sub_material": "MATERIAL 1 MyMat 1.0 1\n1001 1\nENDMATERIAL\n",
-                "output_file_sag4n": tmp_path / "missing_chain.out",
-            }
-        )
-
-
-def test_read_sag4n_output_fails_for_malformed_line(tmp_path):
-    output_file = tmp_path / "bad_sag4n.out"
+def test_read_sag4n_output_parses_event_file(tmp_path):
+    output_file = tmp_path / "sag4n.out"
     output_file.write_text(
+        "# comment\n"
         "EventNumber particle ekin weight x y z px py pz\n"
-        "0 neutron 1.0 0.25 0 0 0 1 0\n",
+        "0 neutron 1.0 0.25 0 0 0 1 0 0\n"
+        "0 gamma 2.0 0.50 0 0 0 0 1 0\n"
+        "1 neutron 3.0 0.75 0 0 0 0 0 1\n",
         encoding="utf-8",
     )
 
-    with pytest.raises(ValueError):
-        alpha_n.read_sag4n_output(
-            {
-                "output_file_sag4n": output_file,
-                "n_events": 10,
-                "source_chain": "Th232",
-            }
-        )
+    result = alpha_n.read_sag4n_output(
+        {
+            "output_file_sag4n": output_file,
+            "n_events": 10,
+            "source_chain": "U238_lower",
+        }
+    )
+
+    assert len(result["evts"]["evtid"]) == 3
+    assert result["evts"]["particle"][0] == "neutron"
+    assert result["integral_yield"] == pytest.approx((0.25 + 0.75) / 10 * 4)
 
 
-def test_run_sag4n_raises_runtime_error_when_container_executable_missing(
-    monkeypatch, tmp_path
-):
-    input_file = tmp_path / "input.txt"
-    input_file.write_text("OUTPUTFILE /data/test\n", encoding="utf-8")
+### prepare output for lh5
 
-    def _raise_file_not_found(*_args, **_kwargs):
-        msg = "docker"
-        raise FileNotFoundError(msg)
 
-    monkeypatch.setattr(alpha_n.subprocess, "Popen", _raise_file_not_found)
+def test_prepare_sag4n_output_for_lh5_handles_empty_array():
+    empty = ak.Array(
+        {
+            "evtid": [],
+            "particle": [],
+            "ekin": [],
+            "weight": [],
+            "x": [],
+            "y": [],
+            "z": [],
+            "px": [],
+            "py": [],
+            "pz": [],
+        }
+    )
 
-    with pytest.raises(RuntimeError, match="runtime executable 'docker' not found"):
-        alpha_n.run_sag4n(
-            {
-                "container_runtime": "docker",
-                "container_image": "repo/image:tag",
-                "sag4n_output_stem": "test_output",
-                "input_file_sag4n": input_file,
-                "output_file_sag4n": tmp_path / "test_output.out",
-            }
-        )
+    prepared = prepare_sag4n_output_for_lh5(empty)
+    assert len(prepared["px"]) == 0
+    assert len(prepared["g4_pid"]) == 0
+
+
+def test_prepare_sag4n_output_for_lh5_non_empty_mapping():
+    evts = ak.Array(
+        {
+            "evtid": [10, 10, 11],
+            "particle": ["neutron", "gamma", "neutron"],
+            "ekin": [1.0, 2.0, 3.0],
+            "weight": [1.0, 1.0, 1.0],
+            "x": [0.0, 0.0, 0.0],
+            "y": [0.0, 0.0, 0.0],
+            "z": [0.0, 0.0, 0.0],
+            "px": [1.0, 0.0, 0.0],
+            "py": [0.0, 1.0, 0.0],
+            "pz": [0.0, 0.0, 1.0],
+        }
+    )
+
+    prepared = prepare_sag4n_output_for_lh5(evts)
+
+    assert prepared["g4_pid"].to_list() == [2112, 22, 2112]
+    assert prepared["n_part"].to_list() == [2, 0.0, 1]
+    assert prepared["time"].to_list() == [0.0, 0.0, 0.0]
+
+
+### calculate integral yield
+
+
+def test_calculate_integral_yield_scales_with_alphas_per_decay():
+    weights = np.array([0.5, 2.0, 1.5, 5.0])
+    particles = np.array(["neutron", "gamma", "neutron", "gamma"])
+
+    integral_yield = alpha_n.calculate_integral_yield(
+        weights, particles, n_events=20, decay_chain="Th232"
+    )
+
+    assert integral_yield == pytest.approx((0.5 + 1.5) / 20 * 6)

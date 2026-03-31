@@ -356,7 +356,7 @@ def cli(args=None) -> None:
     elif args.command == "alpha-n-kin":
         if args.seed == -1:
             random.seed()
-            args.seed = random.randint(0, 1e5)
+            args.seed = random.randint(0, 1000000)
 
         input_data = {
             "output_file": args.output_file,
@@ -364,6 +364,14 @@ def cli(args=None) -> None:
             "seed": args.seed,
             "container_image": args.container_image,
         }
+
+        if (
+            (args.input_file_sag4n != "" and args.gdml_file != "" and args.part != "")
+            or (args.input_file_sag4n != "" and args.sub_material != "")
+            or (args.gdml_file != "" and args.part != "" and args.sub_material != "")
+        ):
+            msg = "You can only provide one of the following options to specify the target material for the alpha-n interaction: (1) a valid SaG4n input file in `input-file-sag4n`, (2) a substitution string for the material in `sub-material` (with `source-chain`) or (3) a gdml file `gdml-file` and name of a logical volume `part` from which to take the material information (with `source-chain`)."
+            raise RuntimeError(msg)
 
         if args.container_runtime != "":
             input_data["container_runtime"] = args.container_runtime
