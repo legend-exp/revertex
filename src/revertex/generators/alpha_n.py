@@ -173,6 +173,59 @@ def _detect_container_runtime(input_data: dict) -> str:
     raise RuntimeError(msg)
 
 
+def _check_for_container_runtime(runtime: str, image: str) -> bool:
+    """Helper function to check if the specified container runtime and image are available."""
+    if runtime == "docker":
+        try:
+            subprocess.run(
+                ["docker", "image", "inspect", image],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError:
+            msg = f"Docker image '{image}' not found. Please pull it with 'docker pull {image}'."
+            raise RuntimeError(msg) from None
+    elif runtime == "shifter":
+        try:
+            proc = subprocess.run(
+                ["shifterimg", "images"],
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+        except subprocess.CalledProcessError as exc:
+            details = (exc.stderr or exc.stdout or str(exc)).strip()
+            msg = f"Failed to query Shifter images via 'shifterimg images': {details}"
+            raise RuntimeError(msg) from exc
+
+        candidates = {image}
+        if image.startswith("docker:"):
+            candidates.add(image.split("docker:", 1)[1])
+        else:
+            candidates.add(f"docker:{image}")
+
+        available = False
+        for line in proc.stdout.splitlines():
+            tokens = line.split()
+            if not tokens:
+                continue
+            if any(token in candidates for token in tokens):
+                available = True
+                break
+
+        if not available:
+            image_hint = image if image.startswith("docker:") else f"docker:{image}"
+            msg = (
+                f"Shifter image '{image}' is not available. "
+                f"Pull it first with 'shifterimg -v pull {image_hint}' and wait until status is READY."
+            )
+            raise RuntimeError(msg)
+    else:
+        msg = f"Unsupported container runtime '{runtime}'."
+        raise ValueError(msg)
+
+
 def calculate_integral_yield(
     weights: np.ndarray, particle: np.ndarray, n_events: int, decay_chain: str
 ) -> float:
@@ -516,52 +569,7 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
     # Validate container image availability
     runtime = input_data["container_runtime"]
     image = input_data["container_image"]
-    if runtime == "docker":
-        try:
-            subprocess.run(
-                ["docker", "image", "inspect", image],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError:
-            msg = f"Docker image '{image}' not found. Please pull it with 'docker pull {image}'."
-            raise RuntimeError(msg) from None
-    elif runtime == "shifter":
-        try:
-            proc = subprocess.run(
-                ["shifterimg", "images"],
-                check=True,
-                capture_output=True,
-                text=True,
-            )
-        except subprocess.CalledProcessError as exc:
-            details = (exc.stderr or exc.stdout or str(exc)).strip()
-            msg = f"Failed to query Shifter images via 'shifterimg images': {details}"
-            raise RuntimeError(msg) from exc
-
-        candidates = {image}
-        if image.startswith("docker:"):
-            candidates.add(image.split("docker:", 1)[1])
-        else:
-            candidates.add(f"docker:{image}")
-
-        available = False
-        for line in proc.stdout.splitlines():
-            tokens = line.split()
-            if not tokens:
-                continue
-            if any(token in candidates for token in tokens):
-                available = True
-                break
-
-        if not available:
-            image_hint = image if image.startswith("docker:") else f"docker:{image}"
-            msg = (
-                f"Shifter image '{image}' is not available. "
-                f"Pull it first with 'shifterimg -v pull {image_hint}' and wait until status is READY."
-            )
-            raise RuntimeError(msg)
+    _check_for_container_runtime(runtime, image)
 
     if "output_file_sag4n" in input_data:
         input_data["output_file_sag4n"] = Path(input_data["output_file_sag4n"])

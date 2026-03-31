@@ -117,7 +117,13 @@ ENDSOURCE
         input_data["output_file_sag4n"] = str(input_data["output_file_sag4n"])
         print(input_data)
 
+    def _fake_check_for_container_runtime():
+        return None
+
     monkeypatch.setattr(alpha_n, "run_sag4n", _fake_run_sag4n)
+    monkeypatch.setattr(
+        alpha_n, "_check_for_container_runtime", _fake_check_for_container_runtime
+    )
 
     args = [
         "alpha-n-kin",
