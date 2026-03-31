@@ -126,6 +126,9 @@ ENDSOURCE
     def _fake_save_sag4n_output_to_lh5(output_data, output_file):  # noqa: ARG001
         return None
 
+    def _fake_detect_container_runtime(input_data):  # noqa: ARG001
+        return "docker"
+
     monkeypatch.setattr(alpha_n, "run_sag4n", _fake_run_sag4n)
     monkeypatch.setattr(
         alpha_n,
@@ -134,6 +137,9 @@ ENDSOURCE
     )
     monkeypatch.setattr(
         alpha_n, "save_sag4n_output_to_lh5", _fake_save_sag4n_output_to_lh5
+    )
+    monkeypatch.setattr(
+        alpha_n, "_detect_container_runtime", _fake_detect_container_runtime
     )
 
     args = [
