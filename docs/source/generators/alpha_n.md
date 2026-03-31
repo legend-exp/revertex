@@ -16,9 +16,9 @@ kinematics for remage simulations.
 
 :::{warning}
 
-At the moment only a single ($\alpha$,n) generator wrapper is available, which is a
-wrapper around the SaG4n tool. More generators such as wrapper around NeuCBOT may be
-added in the future.
+At the moment only a single ($\alpha$,n) generator wrapper is available, which
+is a wrapper around the SaG4n tool. More generators such as wrapper around
+NeuCBOT may be added in the future.
 
 :::
 
