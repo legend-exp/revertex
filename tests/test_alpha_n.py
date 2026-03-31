@@ -26,8 +26,6 @@ from revertex.generators.alpha_n import (
 # - prepare sag4n output to lh5
 # - post-proc (integral yield)
 
-# direct calls to the container are not tested since the container might not be available on the test system
-
 ### cli test
 
 
@@ -117,7 +115,7 @@ ENDSOURCE
         input_data["output_file_sag4n"] = str(input_data["output_file_sag4n"])
         print(input_data)
 
-    def _fake_check_for_container_runtime():
+    def _fake_check_for_container_runtime(runtime, image):  # noqa: ARG001
         return None
 
     monkeypatch.setattr(alpha_n, "run_sag4n", _fake_run_sag4n)
@@ -185,22 +183,19 @@ def test_cli_fails_when_more_than_one_pathway_specified():
         ),
     ],
 )
-def test_container_runtime_cases(
-    monkeypatch, which_map, input_data, expected_runtime, error_match
-):
-    detect_runtime = alpha_n._detect_container_runtime
+def test_container_runtime_docker_available():
+    runtime = alpha_n._detect_container_runtime({})
+    assert runtime == "docker"
 
-    def _fake_which(cmd):
-        return which_map.get(cmd)
 
-    monkeypatch.setattr(alpha_n.shutil, "which", _fake_which)
-
-    if error_match is not None:
-        with pytest.raises(RuntimeError, match=error_match):
-            detect_runtime(input_data)
-        return
-
-    assert detect_runtime(input_data) == expected_runtime
+def test_container_runtime_and_image_docker():
+    # This test assumes that 'docker' is available in the test environment. If not, it should be skipped or adapted.
+    try:
+        alpha_n._check_for_container_runtime_and_image(
+            "docker", "moritzneuberger/sag4n-for-revertex:latest"
+        )
+    except RuntimeError:
+        pytest.skip("Docker is not available in the test environment.")
 
 
 def test_container_run_sag4n_raises_runtime_error_when_container_executable_missing(

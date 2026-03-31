@@ -173,7 +173,7 @@ def _detect_container_runtime(input_data: dict) -> str:
     raise RuntimeError(msg)
 
 
-def _check_for_container_runtime(runtime: str, image: str) -> bool:
+def _check_for_container_runtime_and_image(runtime: str, image: str) -> bool:
     """Helper function to check if the specified container runtime and image are available."""
     if runtime == "docker":
         try:
@@ -569,7 +569,7 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
     # Validate container image availability
     runtime = input_data["container_runtime"]
     image = input_data["container_image"]
-    _check_for_container_runtime(runtime, image)
+    _check_for_container_runtime_and_image(runtime, image)
 
     if "output_file_sag4n" in input_data:
         input_data["output_file_sag4n"] = Path(input_data["output_file_sag4n"])
