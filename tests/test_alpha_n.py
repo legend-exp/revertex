@@ -118,9 +118,17 @@ ENDSOURCE
     def _fake_check_for_container_runtime(runtime, image):  # noqa: ARG001
         return None
 
+    def _fake_save_sag4n_output_to_lh5(output_data, output_file):  # noqa: ARG001
+        return None
+
     monkeypatch.setattr(alpha_n, "run_sag4n", _fake_run_sag4n)
     monkeypatch.setattr(
-        alpha_n, "_check_for_container_runtime", _fake_check_for_container_runtime
+        alpha_n,
+        "_check_for_container_runtime_and_image",
+        _fake_check_for_container_runtime,
+    )
+    monkeypatch.setattr(
+        alpha_n, "save_sag4n_output_to_lh5", _fake_save_sag4n_output_to_lh5
     )
 
     args = [
@@ -143,6 +151,8 @@ ENDSOURCE
     assert "n_events" in generated_input_data
     assert "seed" in generated_input_data
     assert "container_image" in generated_input_data
+
+    input_file.unlink()  # Clean up the temporary input file
 
 
 def test_cli_fails_when_more_than_one_pathway_specified():
