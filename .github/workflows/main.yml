@@ -43,7 +43,7 @@ jobs:
       - name: Pull required container image
         if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
-          docker pull ghcr.io/mneuberger/sag4n:latest
+          docker pull moritzneuberger/sag4n-for-revertex:latest
       - name: Run unit tests
         run: |
           python -m pytest
