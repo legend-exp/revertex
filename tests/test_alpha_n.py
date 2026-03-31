@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import shutil
 import tempfile
 from pathlib import Path
 
@@ -14,7 +15,11 @@ from revertex.generators.alpha_n import (
     generate_material_input,
     generate_sag4n_input_file,
     prepare_sag4n_output_for_lh5,
+    run_sag4n,
 )
+
+# Check if Docker is available
+_DOCKER_AVAILABLE = shutil.which("docker") is not None
 
 # Layout of tests:
 # - cli tests
@@ -175,19 +180,18 @@ def test_cli_fails_when_more_than_one_pathway_specified():
         cli(args)
 
 
+@pytest.mark.skipif(not _DOCKER_AVAILABLE, reason="Docker is not available")
 def test_container_runtime_docker_available():
     runtime = alpha_n._detect_container_runtime({})
     assert runtime == "docker"
 
 
+@pytest.mark.skipif(not _DOCKER_AVAILABLE, reason="Docker is not available")
 def test_container_runtime_and_image_docker():
     # This test assumes that 'docker' is available in the test environment. If not, it should be skipped or adapted.
-    try:
-        alpha_n._check_for_container_runtime_and_image(
-            "docker", "moritzneuberger/sag4n-for-revertex:latest"
-        )
-    except RuntimeError:
-        pytest.skip("Docker is not available in the test environment.")
+    alpha_n._check_for_container_runtime_and_image(
+        "docker", "moritzneuberger/sag4n-for-revertex:latest"
+    )
 
 
 def test_container_run_sag4n_raises_runtime_error_when_container_executable_missing(
@@ -530,6 +534,32 @@ def test_generate_alpha_n_spectrum_fails_when_source_chain_missing_for_sub_mater
                 "container_image": "repo/image:tag",
             }
         )
+
+
+@pytest.mark.skipif(not _DOCKER_AVAILABLE, reason="Docker is not available")
+def test_call_to_sag4n(tmp_path):
+    input_data = {
+        "output_file": tmp_path / "final_output.lh5",
+        "sub_material": "MATERIAL 1 MyMat 1.0 1\n8016 1\nENDMATERIAL\n",
+        "source_chain": "Th232",
+        "container_image": "moritzneuberger/sag4n-for-revertex:latest",
+        "container_runtime": "docker",
+        "n_events": 1000000,
+        "sag4n_output_stem": "test_alpha_n_spectrum",
+        "output_file_sag4n": tmp_path / "test_alpha_n_spectrum.out",
+        "seed": 12345,
+    }
+    input_file = generate_sag4n_input_file(input_data)
+    input_data["input_file_sag4n"] = Path(input_file)
+    run_sag4n(input_data)
+
+    assert input_data["output_file_sag4n"].exists()
+
+    result = alpha_n.read_sag4n_output(input_data)
+
+    assert len(result["evts"]["evtid"]) == 1
+    assert result["evts"]["evtid"][0] == 548822
+    assert result["evts"]["particle"][0] == "gamma"
 
 
 ### read sag4n output

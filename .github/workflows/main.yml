@@ -41,6 +41,7 @@ jobs:
           python -m pip install --upgrade pip wheel setuptools
           python -m pip install --upgrade .[test]
       - name: Pull required container image
+        if: ${{ matrix.os == 'ubuntu-latest' }}
         run: |
           docker pull moritzneuberger/sag4n-for-revertex:latest
       - name: Run unit tests
