@@ -180,24 +180,6 @@ def test_container_runtime_and_image_docker():
         pytest.skip("Docker is not available in the test environment.")
 
 
-@pytest.mark.parametrize(
-    ("which_map", "input_data", "expected_runtime", "error_match"),
-    [
-        ({"docker": None, "shifter": "/usr/bin/shifter"}, {}, "shifter", None),
-        (
-            {"docker": None, "shifter": None},
-            {"container_runtime": "docker"},
-            None,
-            "was not found in PATH",
-        ),
-        (
-            {"docker": None, "shifter": None},
-            {},
-            None,
-            "No supported container runtime found",
-        ),
-    ],
-)
 def test_container_run_sag4n_raises_runtime_error_when_container_executable_missing(
     monkeypatch, tmp_path
 ):
