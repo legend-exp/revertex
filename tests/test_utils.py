@@ -68,3 +68,48 @@ def test_borehole(test_data_configs):
     assert isinstance(borehole_vol, float)
 
     assert utils.get_borehole_weights({"V99000A": hpge_IC})[0] == 1.0
+
+
+def test_collect_isotopes(test_gdml):
+    reg = pyg4ometry.gdml.Reader(str(test_gdml)).getRegistry()
+
+    material = reg.logicalVolumeDict["V99000A"].material
+    isotopes: dict[int, float] = {}
+    utils.collect_isotopes(
+        material,
+        1.0,
+        isotopes,
+        pyg4ometry.geant4.Registry(),
+        pyg4ometry.geant4.getNistElementZToName(),
+        pyg4ometry,
+    )
+
+    assert len(isotopes) == 2
+    assert 32074 in isotopes
+    assert 32076 in isotopes
+    assert np.isclose(isotopes[32074], 0.25)
+    assert np.isclose(isotopes[32076], 0.75)
+
+
+def test_collect_isotopes_resolves_string_component_names():
+    reg = pyg4ometry.geant4.Registry()
+
+    _manganese = pyg4ometry.geant4.ElementSimple(
+        "Manganese", "Mn", 25, 54.938, registry=reg
+    )
+
+    class DummyMaterial:
+        components = [("Manganese", 1.0, "massfraction")]  # noqa: RUF012
+
+    isotopes: dict[int, float] = {}
+    utils.collect_isotopes(
+        DummyMaterial(),
+        1.0,
+        isotopes,
+        reg,
+        pyg4ometry.geant4.getNistElementZToName(),
+        pyg4ometry,
+    )
+
+    assert 25055 in isotopes
+    assert np.isclose(sum(isotopes.values()), 1.0)
