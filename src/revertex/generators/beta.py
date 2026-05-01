@@ -4,8 +4,8 @@ import logging
 
 import awkward as ak
 import hist
+import lh5
 import numpy as np
-from lgdo import lh5
 from numpy.typing import ArrayLike
 from scipy.spatial.transform import Rotation as rot
 
