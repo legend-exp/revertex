@@ -5,8 +5,8 @@ from collections.abc import Callable
 
 import awkward as ak
 import hist
+import lh5
 import numpy as np
-from lgdo import lh5
 from lgdo.types import Array, Table
 from numpy.typing import ArrayLike
 

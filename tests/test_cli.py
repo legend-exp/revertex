@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from lgdo import lh5
+import lh5
 
 from revertex.cli import cli
 
