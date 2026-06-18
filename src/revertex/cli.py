@@ -7,7 +7,7 @@ import random
 import pyg4ometry
 
 from revertex import core, utils
-from revertex.generators import alpha_n, beta, borehole, shell, surface
+from revertex.generators import alpha_n, beta, borehole, musun_gs, shell, surface
 from revertex.utils import setup_log
 
 log = logging.getLogger(__name__)
@@ -268,6 +268,54 @@ def cli(args=None) -> None:
         default="",
         help="Folder and stem path of SaG4n output files (.out, .root, .log). These are usually temporary files deleted after processing.",
     )
+    musun_gs_parser = subparsers.add_parser(
+        "musun-gs",
+        help="Generate atmospheric muon kinematics using musun-gs.",
+    )
+    musun_gs_parser.add_argument(
+        "--out-file",
+        "-o",
+        required=True,
+        type=str,
+        help="Path to the output LH5 file.",
+    )
+    musun_gs_parser.add_argument(
+        "--n-events",
+        "-n",
+        required=True,
+        type=int,
+        help="Total number of muons to generate.",
+    )
+    musun_gs_parser.add_argument(
+        "--dx-cm",
+        type=float,
+        default=4000.0,
+        help="Full width of the sampling cuboid in x [cm] (default: 4000 = 40 m).",
+    )
+    musun_gs_parser.add_argument(
+        "--dy-cm",
+        type=float,
+        default=2000.0,
+        help="Full width of the sampling cuboid in y [cm] (default: 2000 = 20 m).",
+    )
+    musun_gs_parser.add_argument(
+        "--dz-cm",
+        type=float,
+        default=3500.0,
+        help="Full height of the sampling cuboid in z [cm] (default: 3500 = 35 m).",
+    )
+    musun_gs_parser.add_argument(
+        "--container-image",
+        type=str,
+        default=musun_gs.DEFAULT_CONTAINER_IMAGE,
+        help="Docker/Shifter image to use (default: %(default)s).",
+    )
+    musun_gs_parser.add_argument(
+        "--container-runtime",
+        type=str,
+        default=None,
+        help="Container runtime: 'docker' or 'shifter' (default: auto-detect).",
+    )
 
     args = parser.parse_args(args)
 
@@ -332,6 +380,21 @@ def cli(args=None) -> None:
             distance=args.radius,
             surface_type=args.surface_type,
         )
+    elif args.command == "musun-gs":
+        msg = "Generating musun-gs muon kinematics and vertices to %s with seed %s"
+        log.info(msg, args.out_file, args.seed)
+
+        musun_gs.generate_musun_primaries(
+            n_muons=args.n_events,
+            out_file=args.out_file,
+            seed=args.seed,
+            dx_cm=args.dx_cm,
+            dy_cm=args.dy_cm,
+            dz_cm=args.dz_cm,
+            container_image=args.container_image,
+            container_runtime=args.container_runtime,
+        )
+
     elif args.command == "hpge-borehole-pos":
         msg = "Generating points on the HPGes boreholes for \n"
         msg += f"gdml:      {args.gdml} \n"
