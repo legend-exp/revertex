@@ -167,10 +167,13 @@ def convert_output_kin(
     *,
     eunit: str = "keV",
     tunit: str = "ns",
+    lunit: str = "mm",
+    include_positions: bool = False,
 ) -> Table:
     """Converts the vertices to the correct output format for `kin` information.
 
     This follows the convention `defined by remage <remage:manual-input-kinetics>`__
+    and optionally can also include positions into a combined table.
 
     Parameters
     ----------
@@ -180,6 +183,10 @@ def convert_output_kin(
         Unit for energy, by default keV.
     tunit
         Unit for time, by default ns.
+    lunit
+        Unit for distances, by default mm.
+    include_positions
+        If positions (xloc/yloc/zloc)
 
     Returns
     -------
@@ -191,21 +198,32 @@ def convert_output_kin(
     assert all(x == lens[0] for x in lens)
     out = Table(size=lens[0])
 
-    for field in ["px", "py", "pz", "ekin", "time"]:
+    def _flatten_col(arr: ak.Array, field: str, dtype) -> ArrayLike:
         assert arr[field].ndim in (1, 2)
-        unit = eunit if field == "ekin" else ""
-        unit = tunit if field == "time" else ""
         col = ak.flatten(arr[field]) if arr[field].ndim > 1 else arr[field]
         assert col.ndim == 1
-        col = col.to_numpy().astype(np.float64, copy=False)
+        return col.to_numpy().astype(dtype, copy=False)
+
+    for field in ["px", "py", "pz", "ekin", "time"]:
+        col = _flatten_col(arr, field, np.float64)
+        unit = eunit if field == "ekin" else ""
+        unit = tunit if field == "time" else ""
         out.add_field(field, Array(col, attrs={"units": unit}))
 
     for field in ["g4_pid"]:
-        assert arr[field].ndim in (1, 2)
-        col = ak.flatten(arr[field]) if arr[field].ndim > 1 else arr[field]
-        assert col.ndim == 1
-        col = col.to_numpy().astype(np.int64, copy=False)
+        col = _flatten_col(arr, field, np.int64)
         out.add_field(field, Array(col, dtype=np.int64))
+
+    # optionally include positions into table.
+    if include_positions:
+        fields = ak.fields(arr)
+        if "xloc" not in fields or "yloc" not in fields or "zloc" not in fields:
+            msg = "no position columns available to include in output file."
+            raise ValueError(msg)
+
+        for field in ["xloc", "yloc", "zloc"]:
+            col = _flatten_col(arr, field, np.float64)
+            out.add_field(field, Array(col, attrs={"units": lunit}))
 
     # derive the number of particles in each event.
     n_part = np.zeros(lens[0], dtype=np.int64)
