@@ -577,18 +577,33 @@ def generate_alpha_n_spectrum(input_data: dict) -> None:
     """Generate an (alpha, n) spectrum using SaG4n and save it in LH5 format.
 
     There are several ways one can use this wrapper:
-    1. pre-prepared `input_file_sag4n`:
-        The user provides a path `input_file_sag4n` to a valid SaG4n input file. Then only `output_file` has to be provided.
-    2. pre-prepared `sub_material` string:
-        The user provides a `sub_material` string substituted into the template input file. In addition, the user has to provide `source_chain` and `output_file`.
+
+    1. pre-prepared ``input_file_sag4n``:
+       The user provides a path ``input_file_sag4n`` to a valid SaG4n input
+       file. Then only ``output_file`` has to be provided.
+
+    2. pre-prepared ``sub_material`` string:
+       The user provides a ``sub_material`` string substituted into the template
+       input file. In addition, the user has to provide ``source_chain`` and
+       ``output_file``.
+
     3. material read from a gdml file:
-        The user provides a `gdml_file` and `part` name for a logical volume contained in the gdml file. The script will identify the material definition of this part and automatically generate the `sub_material`. In addition, the user has to provide `source_chain` and `output_file`.
+       The user provides a ``gdml_file`` and ``part`` name for a logical volume
+       contained in the gdml file. The script will identify the material
+       definition of this part and automatically generate the ``sub_material``.
+       In addition, the user has to provide ``source_chain`` and ``output_file``.
+
     Additional optional input is:
-    - `n_events`: Number of events to simulate in SaG4n. Default is 10 million.
-    - `seed`: Random seed for the SaG4n simulation. Default is 1234567.
-    - `container_runtime`: Container runtime to use (`docker` or `shifter`). If omitted, the script auto-detects (`docker` first, then `shifter`).
-    - `container_image`: Name of the container image used to run SaG4n. Default is 'moritzneuberger/sag4n-for-revertex:latest'.
-    - `output_file_sag4n`: Folder and stem path of SaG4n output files (.out, .root, .log). These are usually temporary files deleted after processing.
+
+    - ``n_events``: Number of events to simulate in SaG4n. Default is 10 million.
+    - ``seed``: Random seed for the SaG4n simulation. Default is 1234567.
+    - ``container_runtime``: Container runtime to use (``docker`` or ``shifter``).
+      If omitted, the script auto-detects (``docker`` first, then ``shifter``).
+    - ``container_image``: Name of the container image used to run SaG4n.
+      Default is ``moritzneuberger/sag4n-for-revertex:latest``.
+    - ``output_file_sag4n``: Folder and stem path of SaG4n output files
+      (.out, .root, .log). These are usually temporary files deleted after
+      processing.
     """
 
     if "output_file" not in input_data:
