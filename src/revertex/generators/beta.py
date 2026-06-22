@@ -10,7 +10,8 @@ from numpy.typing import ArrayLike
 from scipy.spatial.transform import Rotation as rot
 
 from revertex import utils
-from revertex.core import _get_chunks, convert_output_kin, sample_histogram
+from revertex.core import _get_chunks, convert_output_kin
+from revertex.sampling import sample_histogram
 
 log = logging.getLogger(__name__)
 

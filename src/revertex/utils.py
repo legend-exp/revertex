@@ -10,7 +10,7 @@ import pygeomhpges
 import pygeomtools
 from pyg4ometry import geant4
 
-from revertex import core
+from revertex import sampling
 
 log = logging.getLogger(__name__)
 
@@ -157,7 +157,7 @@ def get_borehole_volume(hpge: pygeomhpges.HPGe, size=1000000):
     height = max(z)
     radius = max(r)
 
-    points = core.sample_cylinder(
+    points = sampling.sample_cylinder(
         r_range=(0, radius), z_range=(0, height), seed=None, size=size
     )
     vol = np.pi * radius**2 * height
