@@ -140,6 +140,26 @@ def test_convert_kin():
         assert ak.all(converted[f] == ak.flatten(arr[f]))
     assert ak.all(converted["n_part"] == ak.Array([2, 0, 2, 0, 1]))
 
+    # multiple particles & positions.
+    arr = ak.Array(
+        {
+            "px": [[1, 2], [3, 4], [5]],
+            "py": [[1, 2], [3, 4], [5]],
+            "pz": [[1, 2], [3, 4], [5]],
+            "xloc": [[1, 2], [3, 4], [5]],
+            "yloc": [[1, 2], [3, 4], [5]],
+            "zloc": [[1, 2], [3, 4], [5]],
+            "time": [[1, 2], [3, 4], [5]],
+            "ekin": [[1, 2], [3, 4], [5]],
+            "g4_pid": [[11, 11], [11, 11], [22]],
+        }
+    )
+    converted = core.convert_output_kin(arr, include_positions=True).view_as("ak")
+
+    for f in arr.fields:
+        assert ak.all(converted[f] == ak.flatten(arr[f]))
+    assert ak.all(converted["n_part"] == ak.Array([2, 0, 2, 0, 1]))
+
 
 def test_sample_proportional_radius():
     samples = core.sample_proportional_radius(
