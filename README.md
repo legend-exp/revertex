@@ -11,6 +11,7 @@
 ![GitHub pull requests](https://img.shields.io/github/issues-pr/legend-exp/revertex?logo=github)
 ![License](https://img.shields.io/github/license/legend-exp/revertex)
 [![Read the Docs](https://img.shields.io/readthedocs/revertex?logo=readthedocs)](https://revertex.readthedocs.io)
+[![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.20798501.svg)](https://doi.org/10.5281/zenodo.20798501)
 
 _revertex_ provides functionality to generate event vertices (primarily
 positions, but also kinematics) that can be read into _remage_ (see
