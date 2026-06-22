@@ -5,7 +5,7 @@ import hist
 import numpy as np
 from scipy import stats
 
-from revertex import core
+from revertex import core, sampling
 
 
 def test_hist_sample_one_dim():
@@ -15,7 +15,7 @@ def test_hist_sample_one_dim():
 
     h = hist.Hist.new.Reg(10, 0, 10).Double().fill([0.1, 0.1])
 
-    samples = core.sample_histogram(h, size=1000)
+    samples = sampling.sample_histogram(h, size=1000)
 
     # all samples in the right bin
     assert np.all((samples > 0) & (samples < 1))
@@ -26,7 +26,7 @@ def test_hist_sample_one_dim():
     n = 10
     h = hist.Hist.new.Reg(10, 0, n).Double().fill(rng.uniform(0, 10, size=n_tot))
 
-    samples = core.sample_histogram(h, size=n_tot)
+    samples = sampling.sample_histogram(h, size=n_tot)
     h2 = hist.Hist.new.Reg(10, 0, n).Double().fill(samples)
 
     expected_fraction, _ = h.to_numpy()
@@ -56,7 +56,7 @@ def test_hist_sample_two_dim():
         .fill([0.1, 0.1], [0.1, 0.1])
     )
 
-    samples_x, samples_y = core.sample_histogram(h, size=1000)
+    samples_x, samples_y = sampling.sample_histogram(h, size=1000)
 
     # all samples in the right bin
     assert np.all((samples_x > 0) & (samples_x < 1))
@@ -74,7 +74,7 @@ def test_hist_sample_two_dim():
         .Double()
         .fill(rng.uniform(0, 10, size=n_tot), rng.uniform(0, 10, size=n_tot))
     )
-    sample_x, sample_y = core.sample_histogram(h, size=n_tot)
+    sample_x, sample_y = sampling.sample_histogram(h, size=n_tot)
     h2 = hist.Hist.new.Reg(10, 0, n).Reg(10, 0, n).Double().fill(sample_x, sample_y)
     expected_fraction, _, _ = h.to_numpy()
     fraction, _, _ = h2.to_numpy()
@@ -162,12 +162,12 @@ def test_convert_kin():
 
 
 def test_sample_proportional_radius():
-    samples = core.sample_proportional_radius(
+    samples = sampling.sample_proportional_radius(
         np.zeros(10000), np.ones(10000), size=10000
     )
     assert len(samples) == 10000
 
 
 def test_sample_cylinder():
-    samples = core.sample_cylinder((0, 10), (-1, 11), 100, None)
+    samples = sampling.sample_cylinder((0, 10), (-1, 11), 100, None)
     assert samples.shape == (100, 3)

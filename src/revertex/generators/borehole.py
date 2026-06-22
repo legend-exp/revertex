@@ -7,7 +7,7 @@ import numpy as np
 import pygeomhpges
 from numpy.typing import ArrayLike, NDArray
 
-from revertex import core, utils
+from revertex import sampling, utils
 
 log = logging.getLogger(__name__)
 
@@ -95,7 +95,7 @@ def _sample_hpge_borehole_impl(
         seed_tmp = seed_tmp * 7 if seed_tmp is not None else seed
 
         # get some proposed points
-        proposals = core.sample_cylinder(
+        proposals = sampling.sample_cylinder(
             r_range=(0, radius),
             z_range=(0, height),
             size=size,

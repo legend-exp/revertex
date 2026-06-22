@@ -8,7 +8,7 @@ import pygeomhpges
 from numpy.typing import ArrayLike, NDArray
 from scipy.stats import rv_continuous
 
-from revertex import core, utils
+from revertex import sampling, utils
 
 log = logging.getLogger(__name__)
 
@@ -116,7 +116,7 @@ def _sample_hpge_surface_impl(
     r1 = s1[sides][:, 0]
     r2 = s2[sides][:, 0]
 
-    frac = core.sample_proportional_radius(r1, r2, size=(len(sides)))
+    frac = sampling.sample_proportional_radius(r1, r2, size=(len(sides)))
 
     rz_coords = s1[sides] + (s2[sides] - s1[sides]) * frac[:, np.newaxis]
 
