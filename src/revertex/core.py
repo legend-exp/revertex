@@ -76,21 +76,25 @@ def convert_output_kin(
     assert all(x == lens[0] for x in lens)
     out = Table(size=lens[0])
 
-    def _flatten_col(arr: ak.Array, field: str, dtype) -> ArrayLike:
+    def _flatten_col(arr: ak.Array, field: str, dtype) -> tuple[ArrayLike, dict]:
         assert arr[field].ndim in (1, 2)
+        attrs = {}
+        if field == "ekin":
+            attrs["units"] = eunit
+        elif field == "time":
+            attrs["units"] = tunit
+
         col = ak.flatten(arr[field]) if arr[field].ndim > 1 else arr[field]
         assert col.ndim == 1
-        return col.to_numpy().astype(dtype, copy=False)
+        return col.to_numpy().astype(dtype, copy=False), attrs
 
     for field in ["px", "py", "pz", "ekin", "time"]:
-        col = _flatten_col(arr, field, np.float64)
-        unit = eunit if field == "ekin" else ""
-        unit = tunit if field == "time" else ""
-        out.add_field(field, Array(col, attrs={"units": unit}))
+        col, attrs = _flatten_col(arr, field, np.float64)
+        out.add_field(field, Array(col, attrs=attrs))
 
     for field in ["g4_pid"]:
-        col = _flatten_col(arr, field, np.int64)
-        out.add_field(field, Array(col, dtype=np.int64))
+        col, attrs = _flatten_col(arr, field, np.int64)
+        out.add_field(field, Array(col))
 
     # optionally include positions into table.
     if include_positions:
@@ -100,7 +104,7 @@ def convert_output_kin(
             raise ValueError(msg)
 
         for field in ["xloc", "yloc", "zloc"]:
-            col = _flatten_col(arr, field, np.float64)
+            col, _ = _flatten_col(arr, field, np.float64)
             out.add_field(field, Array(col, attrs={"units": lunit}))
 
     # derive the number of particles in each event.
