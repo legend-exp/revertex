@@ -116,7 +116,18 @@ def test_parse_output_time_is_zero(sample_output_file):
 # ---------------------------------------------------------------------------
 
 
-def _fake_run_container(n_muons, seed, dx_cm, dy_cm, dz_cm, runtime, image):  # noqa: ARG001
+def _fake_run_container(
+    n_muons,
+    seed,
+    dx_cm,
+    dy_cm,
+    dz_cm,
+    center_x_cm,
+    center_y_cm,
+    center_z_cm,
+    runtime,  # noqa: ARG001
+    image,  # noqa: ARG001
+):
     """Return synthetic kinematics, positions and a fake rate without calling Docker."""
     rng = np.random.default_rng(seed)
     ekin = rng.uniform(1e5, 1e9, n_muons)
@@ -137,9 +148,15 @@ def _fake_run_container(n_muons, seed, dx_cm, dy_cm, dz_cm, runtime, image):  # 
     )
     pos_ak = ak.Array(
         {
-            "xloc": rng.uniform(-dx_cm * 10, dx_cm * 10, n_muons),
-            "yloc": rng.uniform(-dy_cm * 10, dy_cm * 10, n_muons),
-            "zloc": rng.uniform(-dz_cm * 10, dz_cm * 10, n_muons),
+            "xloc": rng.uniform(
+                center_x_cm - dx_cm * 10, center_x_cm + dx_cm * 10, n_muons
+            ),
+            "yloc": rng.uniform(
+                center_y_cm - dy_cm * 10, center_y_cm + dy_cm * 10, n_muons
+            ),
+            "zloc": rng.uniform(
+                center_z_cm - dz_cm * 10, center_z_cm + dz_cm * 10, n_muons
+            ),
         }
     )
     return kin_ak, pos_ak, 4.419e-1
@@ -190,7 +207,3 @@ def test_cli_musun_gs(tmptestdir):
 
     # one particle per event
     assert np.all(ak.to_numpy(kin.n_part) == 1)
-
-    # global rate scalar must be present
-    rate = lh5.read("vtx/rate", out_file)
-    assert rate.value == pytest.approx(4.419e-1)

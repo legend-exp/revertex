@@ -45,6 +45,5 @@ of the vertices in chunks, and conversion to the correct output format.
 :maxdepth: 1
 
 Generators <generators/index>
-Atmospheric muon generator (musun-gs) <musun_gs>
 Package API reference <api/modules>
 ```

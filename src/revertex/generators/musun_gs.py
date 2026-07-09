@@ -10,7 +10,6 @@ from pathlib import Path
 import awkward as ak
 import lh5
 import numpy as np
-from lgdo.types import Scalar
 from numpy.typing import NDArray
 
 from revertex.core import _get_chunks, convert_output_kin
@@ -31,6 +30,25 @@ _RATE_RE = re.compile(r"Global intensity\s*=\s*([\d.E+\-]+)", re.IGNORECASE)
 
 DEFAULT_CONTAINER_IMAGE = "ghcr.io/legend-exp/musun-gs:latest"
 
+DEFAULT_DIMENSIONS = {
+    "original": {
+        "dx_cm": 4000.0,
+        "dy_cm": 2000.0,
+        "dz_cm": 3500.0,
+        "center_x_cm": 0.0,
+        "center_y_cm": 0.0,
+        "center_z_cm": 0.0,
+    },
+    "hall_c": {
+        "dx_cm": 2250.0,
+        "dy_cm": 2250.0,
+        "dz_cm": 2145.0,
+        "center_x_cm": 0.0,
+        "center_y_cm": 0.0,
+        "center_z_cm": 597.5,
+    },
+}
+
 
 def generate_musun_primaries(
     n_muons: int,
@@ -40,6 +58,10 @@ def generate_musun_primaries(
     dx_cm: float = 4000.0,
     dy_cm: float = 2000.0,
     dz_cm: float = 3500.0,
+    center_x_cm: float = 0.0,
+    center_y_cm: float = 0.0,
+    center_z_cm: float = 0.0,
+    default_dimensions: str | None = None,
     container_image: str = DEFAULT_CONTAINER_IMAGE,
     container_runtime: str | None = None,
 ) -> None:
@@ -73,6 +95,15 @@ def generate_musun_primaries(
         Full width of the sampling cuboid along y [cm] (default 20 m).
     dz_cm
         Full height of the sampling cuboid along z [cm] (default 35 m).
+    center_x_cm
+        x-coordinate of the cuboid center [cm] (default 0).
+    center_y_cm
+        y-coordinate of the cuboid center [cm] (default 0).
+    center_z_cm
+        z-coordinate of the cuboid center [cm] (default 0).
+    default_dimensions
+        If not ``None``, overrides the cuboid dimensions with a predefined
+        set with the options defined in ``DEFAULT_DIMENSIONS``.
     container_image
         Docker/Shifter image reference.
     container_runtime
@@ -88,6 +119,21 @@ def generate_musun_primaries(
     chunk_seed = seed
     global_rate: float | None = None
 
+    if default_dimensions is not None:
+        if default_dimensions not in DEFAULT_DIMENSIONS:
+            msg = (
+                f"Invalid value for default_dimensions: {default_dimensions}. "
+                f"Valid options are: {', '.join(DEFAULT_DIMENSIONS.keys())}."
+            )
+            raise ValueError(msg)
+        dims = DEFAULT_DIMENSIONS[default_dimensions]
+        dx_cm = dims["dx_cm"]
+        dy_cm = dims["dy_cm"]
+        dz_cm = dims["dz_cm"]
+        center_x_cm = dims["center_x_cm"]
+        center_y_cm = dims["center_y_cm"]
+        center_z_cm = dims["center_z_cm"]
+
     for idx, chunk in enumerate(chunks):
         kin_ak, pos_ak, rate = _run_container(
             int(chunk),
@@ -95,6 +141,9 @@ def generate_musun_primaries(
             dx_cm,
             dy_cm,
             dz_cm,
+            center_x_cm,
+            center_y_cm,
+            center_z_cm,
             runtime,
             container_image,
         )
@@ -111,14 +160,13 @@ def generate_musun_primaries(
             }
         )
         kin_lh5 = convert_output_kin(combined_ak, include_positions=True, lunit="mm")
-        lh5.write(kin_lh5, "vtx/kin", out_file, wo_mode="append")
+        mode = "of" if idx == 0 else "append"
+        lh5.write(kin_lh5, "vtx/kin", out_file, wo_mode=mode)
 
         msg = "Chunk %d/%d: wrote %d muons to %s"
         log.info(msg, idx + 1, len(chunks), int(chunk), out_file)
 
     if global_rate is not None:
-        rate_scalar = Scalar(value=global_rate, attrs={"units": "(s)^-1"})
-        lh5.write(rate_scalar, "vtx/rate", out_file, wo_mode="append")
         log.info("Global muon intensity: %.4e (s)^-1", global_rate)
     else:
         log.warning("Could not parse global muon intensity from container log.")
@@ -162,21 +210,32 @@ def _check_image(runtime: str, image: str) -> None:
             )
             raise RuntimeError(msg)
     if runtime == "shifter":
+        shifter_image = image
+        if ":" not in shifter_image.split("/")[0]:
+            shifter_image = f"docker:{shifter_image}"
         result = subprocess.run(
-            ["shifterimg", "lookup", image],
+            ["shifterimg", "lookup", shifter_image],
             capture_output=True,
             check=False,
         )
         if result.returncode != 0:
             msg = (
-                f"Shifter image '{image}' not found. "
-                f"Follow the quick start instructions on https://github.com/legend-exp/MUSUN-gs."
+                f"Shifter image '{shifter_image}' not found. "
+                "Follow the quick start instructions on https://github.com/legend-exp/MUSUN-gs."
             )
             raise RuntimeError(msg)
 
 
 def _write_namelist(
-    path: Path, n_muons: int, seed: int, dx_cm: float, dy_cm: float, dz_cm: float
+    path: Path,
+    n_muons: int,
+    seed: int,
+    dx_cm: float,
+    dy_cm: float,
+    dz_cm: float,
+    center_x_cm: float,
+    center_y_cm: float,
+    center_z_cm: float,
 ) -> None:
     path.write_text(
         f"&musun_config\n"
@@ -185,6 +244,9 @@ def _write_namelist(
         f"  dx_cm   = {dx_cm}\n"
         f"  dy_cm   = {dy_cm}\n"
         f"  dz_cm   = {dz_cm}\n"
+        f"  center_x_cm = {center_x_cm}\n"
+        f"  center_y_cm = {center_y_cm}\n"
+        f"  center_z_cm = {center_z_cm}\n"
         f"/\n"
     )
 
@@ -200,20 +262,37 @@ def _run_container(
     dx_cm: float,
     dy_cm: float,
     dz_cm: float,
+    center_x_cm: float,
+    center_y_cm: float,
+    center_z_cm: float,
     runtime: str,
     image: str,
 ) -> tuple[ak.Array, ak.Array, float | None]:
     with tempfile.TemporaryDirectory(prefix=".revertex_musun_") as tmpdir:
         tmp = Path(tmpdir)
-        _write_namelist(tmp / "input.nml", n_muons, seed, dx_cm, dy_cm, dz_cm)
+        _write_namelist(
+            tmp / "input.nml",
+            n_muons,
+            seed,
+            dx_cm,
+            dy_cm,
+            dz_cm,
+            center_x_cm,
+            center_y_cm,
+            center_z_cm,
+        )
 
         if runtime == "docker":
             cmd = ["docker", "run", "--rm", "-v", f"{tmpdir}:/data", image]
         elif runtime == "shifter":
+            shifter_image = image
+            if ":" not in shifter_image.split("/")[0]:
+                shifter_image = f"docker:{shifter_image}"
             cmd = [
                 "shifter",
-                f"--image={image}",
+                f"--image={shifter_image}",
                 f"--volume={tmpdir}:/data",
+                "--workdir=/data",
                 "--entrypoint",
             ]
         else:
@@ -249,7 +328,7 @@ def _run_container(
 def _parse_output(path: Path) -> tuple[ak.Array, ak.Array]:
     """Parse musun-gs ASCII output into kinematic and position ak.Arrays.
 
-    Output columns: muon_num  id_part  energy_GeV  x_cm  y_cm  z_cm  cx  cy  cz
+    Output columns: muon_num  id_part  energy_GeV  x_cm  y_cm  z_cm  mx  my  mz
     id_part: GEANT3 (10 = mu+, 11 = mu-)
     """
     data: NDArray = np.loadtxt(path)

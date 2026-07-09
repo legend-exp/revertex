@@ -12,8 +12,8 @@ parses the ASCII output, and saves the result to an LH5 file following the
 
 ## Prerequisites
 
-A pre-built container image of musun-gs must be available. Users can install it
-either by pulling the repository and building the container locally:
+A pre-built container image of musun-gs must be available. Users can obtain it
+by pulling the image directly:
 
 ```console
 $ docker pull ghcr.io/legend-exp/musun-gs:latest
@@ -45,38 +45,37 @@ $ revertex musun-gs \
     --n-events 1000000
 ```
 
-All geometry parameters are optional and default to the LNGS Hall A volume:
+The sampling cuboid is selected with `--default-dimensions`, which defaults to
+the musun `original`. Pass one of the predefined sets (`original` or `hall_c`)
+to use its dimensions:
 
 ```console
 $ revertex musun-gs \
     --out-file muons.lh5 \
     --n-events 5000000 \
     --seed 42 \
-    --dx-cm 4000 \
-    --dy-cm 2000 \
-    --dz-cm 3500 \
+    --default-dimensions hall_c \
     --container-image ghcr.io/legend-exp/musun-gs:latest
+```
+
+When a predefined set is used, the individual `--dx-cm`, `--dy-cm`, `--dz-cm`
+and `--center-*-cm` options are **ignored**. To specify the cuboid by hand, pass
+`--default-dimensions custom` together with all six dimension options:
+
+```console
+$ revertex musun-gs \
+    --out-file muons.lh5 \
+    --n-events 5000000 \
+    --seed 42 \
+    --default-dimensions custom \
+    --dx-cm 4000 --dy-cm 2000 --dz-cm 3500 \
+    --center-x-cm 0 --center-y-cm 0 --center-z-cm 0
 ```
 
 Full option reference:
 
 ```console
 $ revertex musun-gs --help
-```
-
-### Python API
-
-```python
-from revertex.generators.musun_gs import generate_musun_primaries
-
-generate_musun_primaries(
-    n_muons=1_000_000,
-    out_file="muons.lh5",
-    seed=42,
-    dx_cm=4000.0,  # 40 m along x
-    dy_cm=2000.0,  # 20 m along y
-    dz_cm=3500.0,  # 35 m along z
-)
 ```
 
 ## Geometry and coordinate system
@@ -92,6 +91,42 @@ The axes follow the LVD coordinate system used internally by musun-gs:
 - **z** — vertical (upward)
 
 Default values of musun-gs reproduce the LNGS Hall A geometry (40 × 20 × 35 m³).
+
+Several predefined dimension sets are available (`DEFAULT_DIMENSIONS`), selected
+with `default_dimensions=` (Python) or `--default-dimensions` (CLI). Pass
+`custom` to specify the cuboid by hand. The figures below show each predefined
+cuboid (orange outline, with dimension labels) overlaid on a parallel-projection
+view of the [LEGEND-1000 geometry](https://legend-pygeom-l1000.readthedocs.io)
+for scale. Each preset is shown from the front (looking along _x_) and from the
+top (looking along _z_).
+
+The **`original`** musun-gs dimensions (40 × 20 × 35 m³) centered at the origin:
+<!-- prettier-ignore -->
+:::{image} images/musun_gs_sampling_original_front.png
+:height: 300px
+:::
+<!-- prettier-ignore -->
+:::{image} images/musun_gs_sampling_original_top.png
+:height: 300px
+:::
+
+The **`hall_c`** dimensions (22.5 × 22.5 × 21.45 m³) centered at
+`center_z_cm = 597.5` such that there are 2 m of rock above the top of the
+cuboid and the bottom of the cuboid is at the same height as the bottom of the
+LEGEND-1000 cryostat:
+<!-- prettier-ignore -->
+:::{image} images/musun_gs_sampling_hall_c_front.png
+:height: 300px
+:::
+<!-- prettier-ignore -->
+:::{image} images/musun_gs_sampling_hall_c_top.png
+:height: 300px
+:::
+
+:::{note}
+
+The figures are pre-rendered and committed. Regenerate them with
+`docs/generate_docs_images.py` whenever the default dimensions change. :::
 
 ## Output format
 
