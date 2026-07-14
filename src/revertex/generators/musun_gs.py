@@ -75,9 +75,6 @@ def generate_musun_primaries(
     1,000,000 muons. Each chunk uses a different seed so the results are
     statistically independent.
 
-    The global muon intensity reported by musun-gs at startup is stored as the
-    scalar dataset ``/vtx/rate`` (units: ``(s)^-1``).
-
     Parameters
     ----------
     n_muons
