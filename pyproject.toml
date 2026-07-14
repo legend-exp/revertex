@@ -66,6 +66,9 @@ docs = [
     "sphinx",
     "sphinx-copybutton",
 ]
+imagegen = [
+    "legend-pygeom-l1000",
+]
 
 test = [
     "pre-commit",

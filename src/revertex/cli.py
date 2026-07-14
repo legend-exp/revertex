@@ -7,7 +7,7 @@ import random
 import pyg4ometry
 
 from revertex import core, utils
-from revertex.generators import alpha_n, beta, borehole, shell, surface
+from revertex.generators import alpha_n, beta, borehole, musun_gs, shell, surface
 from revertex.utils import setup_log
 
 log = logging.getLogger(__name__)
@@ -268,6 +268,75 @@ def cli(args=None) -> None:
         default="",
         help="Folder and stem path of SaG4n output files (.out, .root, .log). These are usually temporary files deleted after processing.",
     )
+    musun_gs_parser = subparsers.add_parser(
+        "musun-gs",
+        help="Generate atmospheric muon kinematics using musun-gs.",
+    )
+    musun_gs_parser.add_argument(
+        "--out-file",
+        "-o",
+        required=True,
+        type=str,
+        help="Path to the output LH5 file.",
+    )
+    musun_gs_parser.add_argument(
+        "--n-events",
+        "-n",
+        required=True,
+        type=int,
+        help="Total number of muons to generate.",
+    )
+    musun_gs_parser.add_argument(
+        "--default-dimensions",
+        type=str,
+        default="original",
+        help="Use default dimensions for the sampling cuboid. Options are ["
+        + ", ".join(musun_gs.DEFAULT_DIMENSIONS.keys())
+        + ", custom] (default: original). If 'custom' is selected, the user must provide --dx-cm, --dy-cm, --dz-cm, center_x-cm, center_y-cm, center_z-cm to specify the dimensions of the sampling cuboid.",
+    )
+    musun_gs_parser.add_argument(
+        "--dx-cm",
+        type=float,
+        help="Full width of the sampling cuboid in x [cm] (original: 4000 = 40 m).",
+    )
+    musun_gs_parser.add_argument(
+        "--dy-cm",
+        type=float,
+        help="Full width of the sampling cuboid in y [cm] (original: 2000 = 20 m).",
+    )
+    musun_gs_parser.add_argument(
+        "--dz-cm",
+        type=float,
+        help="Full height of the sampling cuboid in z [cm] (original: 3500 = 35 m).",
+    )
+    musun_gs_parser.add_argument(
+        "--center-x-cm",
+        type=float,
+        help="x-coordinate of the cuboid center [cm] (original: 0).",
+    )
+    musun_gs_parser.add_argument(
+        "--center-y-cm",
+        type=float,
+        default=0.0,
+        help="y-coordinate of the cuboid center [cm] (original: 0).",
+    )
+    musun_gs_parser.add_argument(
+        "--center-z-cm",
+        type=float,
+        help="z-coordinate of the cuboid center [cm] (original: 0).",
+    )
+    musun_gs_parser.add_argument(
+        "--container-image",
+        type=str,
+        default=musun_gs.DEFAULT_CONTAINER_IMAGE,
+        help="Docker/Shifter image to use (default: %(default)s).",
+    )
+    musun_gs_parser.add_argument(
+        "--container-runtime",
+        type=str,
+        default=None,
+        help="Container runtime: 'docker' or 'shifter' (default: auto-detect).",
+    )
 
     args = parser.parse_args(args)
 
@@ -332,6 +401,40 @@ def cli(args=None) -> None:
             distance=args.radius,
             surface_type=args.surface_type,
         )
+    elif args.command == "musun-gs":
+        msg = "Generating musun-gs muon kinematics and vertices to %s with seed %s"
+        log.info(msg, args.out_file, args.seed)
+
+        if (
+            args.default_dimensions != "custom"
+            and args.default_dimensions in musun_gs.DEFAULT_DIMENSIONS
+        ):
+            musun_gs.generate_musun_primaries(
+                n_muons=args.n_events,
+                out_file=args.out_file,
+                seed=args.seed,
+                default_dimensions=args.default_dimensions,
+                container_image=args.container_image,
+                container_runtime=args.container_runtime,
+            )
+        elif args.default_dimensions == "custom":
+            musun_gs.generate_musun_primaries(
+                n_muons=args.n_events,
+                out_file=args.out_file,
+                seed=args.seed,
+                dx_cm=args.dx_cm,
+                dy_cm=args.dy_cm,
+                dz_cm=args.dz_cm,
+                center_x_cm=args.center_x_cm,
+                center_y_cm=args.center_y_cm,
+                center_z_cm=args.center_z_cm,
+                container_image=args.container_image,
+                container_runtime=args.container_runtime,
+            )
+        else:
+            msg = f"Invalid value for --default-dimensions: {args.default_dimensions}. Valid options are: {', '.join(musun_gs.DEFAULT_DIMENSIONS.keys())}, custom."
+            raise ValueError(msg)
+
     elif args.command == "hpge-borehole-pos":
         msg = "Generating points on the HPGes boreholes for \n"
         msg += f"gdml:      {args.gdml} \n"
