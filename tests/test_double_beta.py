@@ -75,6 +75,11 @@ def test_read_input_2d_spectrum_invalid(tmp_path):
     with pytest.raises(ValueError, match="eunits"):
         utils.read_input_2d_spectrum(str(path), eunit="GeV")
 
+    path = tmp_path / "one_point.txt"
+    path.write_text("1 1 0.1 0.1 1.0\n")
+    with pytest.raises(ValueError, match="two energies"):
+        utils.read_input_2d_spectrum(str(path))
+
 
 def test_electron_beta():
     assert double_beta.electron_beta(0) == 0
