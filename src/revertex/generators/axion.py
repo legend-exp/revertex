@@ -8,6 +8,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from revertex.core import _get_chunks, convert_output_kin
+from revertex.sampling import rotate_to_axis, sample_isotropic
 
 log = logging.getLogger(__name__)
 
@@ -185,7 +186,7 @@ def generate_axion_kinematics(
     rng = np.random.default_rng(seed=seed)
 
     # isotropic direction of flight of each axion
-    axis = _sample_isotropic(size, seed=rng)
+    axis = sample_isotropic(size, seed=rng)
 
     if process == "axioelectric":
         return _generate_axioelectric(size, energy, axis)
@@ -392,8 +393,8 @@ def _generate_compton(
 
     directions = np.stack(
         [
-            _rotate_to_axis(_unit(p_e), axis),
-            _rotate_to_axis(_unit(k_gamma), axis),
+            rotate_to_axis(_unit(p_e), axis),
+            rotate_to_axis(_unit(k_gamma), axis),
         ],
         axis=1,
     )
@@ -451,8 +452,8 @@ def _generate_pair(
 
     directions = np.stack(
         [
-            _rotate_to_axis(_unit(p_minus[:, 1:]), axis),
-            _rotate_to_axis(_unit(p_plus[:, 1:]), axis),
+            rotate_to_axis(_unit(p_minus[:, 1:]), axis),
+            rotate_to_axis(_unit(p_plus[:, 1:]), axis),
         ],
         axis=1,
     )
@@ -621,40 +622,3 @@ def _mdot(a: NDArray, b: NDArray) -> NDArray:
 def _unit(v: NDArray) -> NDArray:
     """Normalize the rows of an array of vectors."""
     return v / np.linalg.norm(v, axis=1, keepdims=True)
-
-
-def _sample_isotropic(
-    size: int, seed: int | np.random.Generator | None = None
-) -> NDArray:
-    """Generate isotropically distributed unit vectors with shape `(size, 3)`."""
-    rng = np.random.default_rng(seed=seed)
-
-    cos_theta = rng.uniform(low=-1, high=1, size=size)
-    sin_theta = np.sqrt(1 - cos_theta**2)
-    phi = rng.uniform(low=0, high=2 * np.pi, size=size)
-
-    return np.column_stack(
-        (sin_theta * np.cos(phi), sin_theta * np.sin(phi), cos_theta)
-    )
-
-
-def _rotate_to_axis(vectors: NDArray, axis: NDArray) -> NDArray:
-    """Rotate vectors given in a frame with `axis` along +z to the global frame.
-
-    Parameters
-    ----------
-    vectors
-        array with shape `(n, 3)` of vectors in the local frame.
-    axis
-        array with shape `(n, 3)` of unit vectors, the local +z axis of each row.
-    """
-    # orthonormal basis (e1, e2, axis) for every row, with a helper vector that is
-    # never (nearly) parallel to the axis
-    helper = np.tile([1.0, 0.0, 0.0], (len(axis), 1))
-    helper[np.abs(axis[:, 0]) > 0.9] = [0.0, 1.0, 0.0]
-
-    e1 = np.cross(axis, helper)
-    e1 /= np.linalg.norm(e1, axis=1, keepdims=True)
-    e2 = np.cross(axis, e1)
-
-    return vectors[:, :1] * e1 + vectors[:, 1:2] * e2 + vectors[:, 2:3] * axis

@@ -4,7 +4,7 @@ import logging
 
 import hist
 import numpy as np
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 log = logging.getLogger(__name__)
 
@@ -47,7 +47,7 @@ def sample_cylinder(
 
 
 def sample_histogram(
-    histo: hist.Hist, size: int, *, seed: int | None = None
+    histo: hist.Hist, size: int, *, seed: int | np.random.Generator | None = None
 ) -> np.ndarray:
     """Generate samples from a 1D or 2D histogram.
 
@@ -180,3 +180,40 @@ def sample_proportional_radius(
     result[~sign] = 1 - result[~sign]
 
     return result
+
+
+def sample_isotropic(
+    size: int, seed: int | np.random.Generator | None = None
+) -> NDArray:
+    """Generate isotropically distributed unit vectors with shape `(size, 3)`."""
+    rng = np.random.default_rng(seed=seed)
+
+    cos_theta = rng.uniform(low=-1, high=1, size=size)
+    sin_theta = np.sqrt(1 - cos_theta**2)
+    phi = rng.uniform(low=0, high=2 * np.pi, size=size)
+
+    return np.column_stack(
+        (sin_theta * np.cos(phi), sin_theta * np.sin(phi), cos_theta)
+    )
+
+
+def rotate_to_axis(vectors: NDArray, axis: NDArray) -> NDArray:
+    """Rotate vectors given in a frame with `axis` along +z to the global frame.
+
+    Parameters
+    ----------
+    vectors
+        array with shape `(n, 3)` of vectors in the local frame.
+    axis
+        array with shape `(n, 3)` of unit vectors, the local +z axis of each row.
+    """
+    # orthonormal basis (e1, e2, axis) for every row, with a helper vector that is
+    # never (nearly) parallel to the axis
+    helper = np.tile([1.0, 0.0, 0.0], (len(axis), 1))
+    helper[np.abs(axis[:, 0]) > 0.9] = [0.0, 1.0, 0.0]
+
+    e1 = np.cross(axis, helper)
+    e1 /= np.linalg.norm(e1, axis=1, keepdims=True)
+    e2 = np.cross(axis, e1)
+
+    return vectors[:, :1] * e1 + vectors[:, 1:2] * e2 + vectors[:, 2:3] * axis
