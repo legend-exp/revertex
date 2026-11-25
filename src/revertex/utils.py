@@ -4,6 +4,7 @@ import logging
 import re
 
 import colorlog
+import hist
 import numpy as np
 import pyg4ometry.geant4 as pg4
 import pygeomhpges
@@ -53,6 +54,72 @@ def read_input_beta_csv(path: str, **kwargs) -> tuple[np.ndarray, np.ndarray]:
         keyword arguments to pass to `np.genfromtxt`
     """
     return np.genfromtxt(path, **kwargs).T[0], np.genfromtxt(path, **kwargs).T[1]
+
+
+def read_input_2d_spectrum(path: str, *, eunit: str = "MeV") -> hist.Hist:
+    """Read a 2D spectrum of two particle energies into a histogram.
+
+    The file is a whitespace-separated text file, optionally gzip compressed
+    (``.gz``), in the format of the double-beta decay spectra of Kotila and
+    Iachello (``*_2ds.txt`` at https://nucleartheory.yale.edu)::
+
+        index_1  index_2  energy_1  energy_2  value
+
+    The two indices are not used. The energies of each axis are the values that
+    appear in the file. They form a grid, and each grid point becomes the centre
+    of a histogram bin. The value is the spectrum at that point, in arbitrary
+    units. Grid points missing from the file, for example above the endpoint,
+    are set to zero.
+
+    Parameters
+    ----------
+    path
+        path to the text file.
+    eunit
+        the unit of the energies in the file: `eV`, `keV` or `MeV`. The
+        histogram is in keV.
+    """
+    factors = {"eV": 1e-3, "keV": 1.0, "MeV": 1e3}
+    if eunit not in factors:
+        msg = f"Only eunits eV, keV or MeV are supported not {eunit}"
+        raise ValueError(msg)
+
+    data = np.loadtxt(path, ndmin=2)
+    if data.shape[1] != 5:
+        msg = f"{path} must have 5 columns, not {data.shape[1]}"
+        raise ValueError(msg)
+
+    e1 = data[:, 2] * factors[eunit]
+    e2 = data[:, 3] * factors[eunit]
+    value = data[:, 4]
+
+    if np.any(value < 0):
+        msg = f"{path} has negative values, which are not a valid spectrum"
+        raise ValueError(msg)
+
+    points_1 = np.unique(e1)
+    points_2 = np.unique(e2)
+
+    histo = hist.Hist(
+        hist.axis.Variable(_bin_edges(points_1)),
+        hist.axis.Variable(_bin_edges(points_2)),
+    )
+    histo.view()[np.searchsorted(points_1, e1), np.searchsorted(points_2, e2)] = value
+
+    return histo
+
+
+def _bin_edges(points: np.ndarray) -> np.ndarray:
+    """Bin edges with the grid `points` at the bin centres, not below zero."""
+    if len(points) < 2:
+        msg = "the spectrum needs at least two energies per axis"
+        raise ValueError(msg)
+
+    mid = (points[1:] + points[:-1]) / 2
+    first = max(points[0] - (mid[0] - points[0]), 0)
+    last = points[-1] + (points[-1] - mid[-1])
+
+    return np.concatenate(([first], mid, [last]))
 
 
 def find_mother_physical_volumes(

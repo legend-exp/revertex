@@ -39,6 +39,8 @@ modules under `src/revertex/generators/`.
 - momenta generators:
   - `alpha_n.py` contains the implementation of the alpha-n generator wrapper.
   - `beta.py` contains the implementation of a beta decay generator.
+  - `double_beta.py` contains the implementation of a double-beta decay
+    generator (two electrons from a 2D energy spectrum).
 - position generators:
   - `borehole.py` sampling on the borehole of a HPGe
   - `surface.py` sampling on the surface of a HPGe

@@ -12,6 +12,7 @@ from revertex.generators import (
     axion,
     beta,
     borehole,
+    double_beta,
     musun_gs,
     shell,
     surface,
@@ -76,6 +77,40 @@ def cli(args=None) -> None:
         required=True,
         type=str,
         help="Unit for the energy",
+    )
+
+    # double-beta decay spectra
+    double_beta_parser = subparsers.add_parser(
+        "double-beta-kin",
+        help="Generate the two electrons of double-beta decays from a 2D spectrum file.",
+    )
+    double_beta_parser.add_argument(
+        "--input-file",
+        "-i",
+        required=True,
+        type=str,
+        help="Path to the text file with the 2D spectrum of the two electron energies",
+    )
+    double_beta_parser.add_argument(
+        "--out-file",
+        "-o",
+        required=True,
+        type=str,
+        help="Path to the output file.",
+    )
+    double_beta_parser.add_argument(
+        "--n-events",
+        "-n",
+        required=True,
+        type=int,
+        help="Number of decays to generate",
+    )
+    double_beta_parser.add_argument(
+        "--eunit",
+        "-e",
+        default="MeV",
+        type=str,
+        help="Unit of the energies in the input file (default: MeV)",
     )
 
     hpge_surface_parser = subparsers.add_parser(
@@ -408,6 +443,18 @@ def cli(args=None) -> None:
             n_gen=args.n_events,
             out_file=args.out_file,
             in_file=args.input_file,
+            seed=args.seed,
+            eunit=args.eunit,
+        )
+
+    elif args.command == "double-beta-kin":
+        msg = f"Generating double-beta kinematics from {args.input_file} to {args.out_file} and seed {args.seed}"
+        log.info(msg)
+
+        double_beta.save_double_beta_kinematics(
+            args.n_events,
+            args.input_file,
+            args.out_file,
             seed=args.seed,
             eunit=args.eunit,
         )

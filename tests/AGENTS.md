@@ -11,6 +11,8 @@ Python tests are stored in `tests/` and managed with Pytest. Run all tests with
   generate the SaG4n input and parse the output.
 - `test_beta.py`: tests for the beta decay generator in
   `src/revertex/generators/beta.py`.
+- `test_double_beta.py`: tests for the double-beta decay generator in
+  `src/revertex/generators/double_beta.py`.
 - `test_borehole.py`: tests for the borehole position generator in
   `src/revertex/generators/borehole.py`.
 - `test_surface.py`: tests for the surface position generator in
