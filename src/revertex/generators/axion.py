@@ -7,7 +7,7 @@ import lh5
 import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
-from revertex.core import _get_chunks, convert_output_kin, make_kin_array
+from revertex.core import _get_chunks, convert_output_kin
 from revertex.sampling import rotate_to_axis, sample_isotropic
 
 log = logging.getLogger(__name__)
@@ -312,6 +312,26 @@ def _compton_photon_energy(energy: float, mass: float, cos_theta: ArrayLike) -> 
     return (mass**2 + 2 * energy * _ME) / (2 * (energy + _ME - p_a * cos_theta))
 
 
+def _make_output(directions: NDArray, ekin: NDArray, g4_pid: NDArray) -> ak.Array:
+    """Pack the particles into the kinematics array.
+
+    The inputs have shape `(n_events, n_particles)`, with an extra last axis of
+    length 3 for the directions.
+    """
+    out = {
+        "px": directions[..., 0],
+        "py": directions[..., 1],
+        "pz": directions[..., 2],
+        "ekin": ekin,
+        "time": np.zeros_like(ekin),
+        "g4_pid": g4_pid.astype(np.int64),
+    }
+    # variable-length lists, so every event gets its own n_part entry
+    out = {key: ak.from_regular(val, axis=1) for key, val in out.items()}
+
+    return ak.Array(out)
+
+
 def _generate_axioelectric(size: int, energy: float, axis: NDArray) -> ak.Array:
     """Generate the electron of the axioelectric effect.
 
@@ -323,7 +343,7 @@ def _generate_axioelectric(size: int, energy: float, axis: NDArray) -> ak.Array:
     ekin = np.full((size, 1), energy)
     pid = np.full((size, 1), _PID_ELECTRON)
 
-    return make_kin_array(directions, ekin, pid)
+    return _make_output(directions, ekin, pid)
 
 
 def _generate_primakoff(size: int, energy: float, axis: NDArray) -> ak.Array:
@@ -336,7 +356,7 @@ def _generate_primakoff(size: int, energy: float, axis: NDArray) -> ak.Array:
     ekin = np.full((size, 1), energy)
     pid = np.full((size, 1), _PID_GAMMA)
 
-    return make_kin_array(directions, ekin, pid)
+    return _make_output(directions, ekin, pid)
 
 
 def _generate_compton(
@@ -381,7 +401,7 @@ def _generate_compton(
     ekin = np.column_stack([energy - e_gamma, e_gamma])
     pid = np.tile([_PID_ELECTRON, _PID_GAMMA], (size, 1))
 
-    return make_kin_array(directions, ekin, pid)
+    return _make_output(directions, ekin, pid)
 
 
 def _generate_pair(
@@ -440,7 +460,7 @@ def _generate_pair(
     ekin = np.column_stack([p_minus[:, 0] - _ME, p_plus[:, 0] - _ME])
     pid = np.tile([_PID_ELECTRON, _PID_POSITRON], (size, 1))
 
-    return make_kin_array(directions, ekin, pid)
+    return _make_output(directions, ekin, pid)
 
 
 def _pair_msq(k: NDArray, p_minus: NDArray, p_plus: NDArray) -> NDArray:

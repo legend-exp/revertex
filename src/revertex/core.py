@@ -7,7 +7,7 @@ import awkward as ak
 import lh5
 import numpy as np
 from lgdo.types import Array, Table
-from numpy.typing import ArrayLike, NDArray
+from numpy.typing import ArrayLike
 
 log = logging.getLogger(__name__)
 
@@ -38,36 +38,6 @@ def convert_output_pos(
         out.add_field(field, Array(col, attrs={"units": lunit}))
 
     return out
-
-
-def make_kin_array(directions: NDArray, ekin: NDArray, g4_pid: NDArray) -> ak.Array:
-    """Pack the particles of each event into an array of kinematics.
-
-    The output can be written with :func:`convert_output_kin`. All particles
-    are emitted at time zero.
-
-    Parameters
-    ----------
-    directions
-        unit vectors of the momentum directions, with shape
-        `(n_events, n_particles, 3)`.
-    ekin
-        kinetic energies, with shape `(n_events, n_particles)`.
-    g4_pid
-        PDG codes of the particles, with shape `(n_events, n_particles)`.
-    """
-    out = {
-        "px": directions[..., 0],
-        "py": directions[..., 1],
-        "pz": directions[..., 2],
-        "ekin": ekin,
-        "time": np.zeros_like(ekin),
-        "g4_pid": g4_pid.astype(np.int64),
-    }
-    # variable-length lists, so every event gets its own n_part entry
-    out = {key: ak.from_regular(val, axis=1) for key, val in out.items()}
-
-    return ak.Array(out)
 
 
 def convert_output_kin(
@@ -137,13 +107,17 @@ def convert_output_kin(
             col, _ = _flatten_col(arr, field, np.float64)
             out.add_field(field, Array(col, attrs={"units": lunit}))
 
-    # derive the number of particles in each event.
+    # number of particles in each event, written on the first row of the event
+    # and zero on the others. Works for lists of fixed and of variable length.
+    px = arr["px"]
+    if px.ndim == 1:
+        n_evt = np.ones(len(px), dtype=np.int64)
+    else:
+        n_evt = ak.to_numpy(ak.num(px, axis=1)).astype(np.int64)
+    n_evt = n_evt[n_evt > 0]
+
     n_part = np.zeros(lens[0], dtype=np.int64)
-    part_idx = 0
-    for x in arr["px"]:
-        part_evt = len(x) if isinstance(x, ak.Array) else 1
-        n_part[part_idx] = part_evt
-        part_idx += part_evt
+    n_part[np.cumsum(n_evt) - n_evt] = n_evt
 
     out.add_field("n_part", Array(n_part, dtype=np.int64))
 

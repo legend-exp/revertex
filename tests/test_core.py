@@ -140,6 +140,24 @@ def test_convert_kin():
         assert ak.all(converted[f] == ak.flatten(arr[f]))
     assert ak.all(converted["n_part"] == ak.Array([2, 0, 2, 0, 1]))
 
+    # fixed number of particles per event (regular array).
+    two = np.arange(6).reshape(3, 2)
+    arr = ak.Array(
+        {
+            "px": two,
+            "py": two,
+            "pz": two,
+            "time": two,
+            "ekin": two,
+            "g4_pid": np.full((3, 2), 11),
+        }
+    )
+    converted = core.convert_output_kin(arr).view_as("ak")
+
+    for f in arr.fields:
+        assert ak.all(converted[f] == ak.flatten(arr[f]))
+    assert ak.all(converted["n_part"] == ak.Array([2, 0, 2, 0, 2, 0]))
+
     # multiple particles & positions.
     arr = ak.Array(
         {
