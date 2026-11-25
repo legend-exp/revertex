@@ -9,7 +9,7 @@ import numpy as np
 from numpy.typing import ArrayLike, NDArray
 
 from revertex import utils
-from revertex.core import _get_chunks, convert_output_kin
+from revertex.core import _get_chunks, convert_output_kin, make_kin_array
 from revertex.sampling import rotate_to_axis, sample_histogram, sample_isotropic
 
 log = logging.getLogger(__name__)
@@ -120,17 +120,9 @@ def generate_double_beta_kinematics(
 
     directions = np.stack((dir1, dir2), axis=1)
     ekin = np.column_stack((t1, t2))
+    g4_pid = np.full(ekin.shape, _PID_ELECTRON)
 
-    out = {
-        "px": directions[..., 0],
-        "py": directions[..., 1],
-        "pz": directions[..., 2],
-        "ekin": ekin,
-        "time": np.zeros_like(ekin),
-        "g4_pid": np.full(ekin.shape, _PID_ELECTRON, dtype=np.int64),
-    }
-    # variable-length lists, so every decay gets its own n_part entry
-    return ak.Array({key: ak.from_regular(val, axis=1) for key, val in out.items()})
+    return make_kin_array(directions, ekin, g4_pid)
 
 
 def electron_beta(ekin: ArrayLike) -> NDArray:

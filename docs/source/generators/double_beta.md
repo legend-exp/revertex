@@ -28,15 +28,13 @@ $T_1 + T_2$ above the Q-value, are zero. The file can be gzip compressed
 
 Each grid point is the centre of a histogram bin. The generator draws a bin with
 probability proportional to its value, then $T_1$ and $T_2$ uniformly within the
-bin. Spectra calculated by other means (for example the terms $G_0$, $G_2$,
-$G_{22}$ and $G_4$ of the expansion of the 2νββ rate in the lepton energies by
-Šimkovic et al. [^simkovic2018]) can be used once they are written in this
-format.
+bin.
 
 ## Angular correlation
 
-The direction of the first electron is isotropic. For a $0^+ \to 0^+$ decay the
-angle $\theta$ between the two electrons follows [^doi1985]
+The direction of the first electron is isotropic. The angle $\theta$ between the
+two electrons follows the leading-order approximation for a $0^+ \to 0^+$ decay
+[^doi1985]
 
 $$
 \frac{dN}{d\cos\theta} \propto 1 - \beta_1 \beta_2 \cos\theta ,
@@ -46,22 +44,15 @@ $$
 
 where $\beta_i$ is the velocity of electron $i$ (in units of $c$) and $m_e$ the
 electron mass. The electrons are therefore preferentially emitted back to back.
+The factor $\beta_1\beta_2$ uses the same leading-order electron wave functions
+in the Coulomb field of the nucleus as the usual Fermi function [^doi1985].
+Exact Dirac wave functions with screening make the correlation stronger: for
+⁷⁶Ge by about 4 % at electron energies of 500 keV, and by up to 15 % at energies
+near 50 keV and 1.5 MeV [^kotila2012].
+
 The generator samples $\cos\theta$ by inverting the cumulative distribution (see
 {func}`.double_beta.sample_cos_theta`), and the azimuth of the second electron
 around the first uniformly.
-
-The approximations are:
-
-- The factor $\beta_1\beta_2$ uses the same leading-order electron wave
-  functions in the Coulomb field of the nucleus as the usual Fermi function
-  [^doi1985]. Exact Dirac wave functions with screening make the correlation
-  stronger: for ⁷⁶Ge by about 4 % at electron energies of 500 keV, and by up to
-  15 % at energies near 50 keV and 1.5 MeV [^kotila2012].
-- The same factor is used for every input file. In the same approximation the
-  angular term of $G_0$, $G_2$ and $G_4$ is exactly this factor [^devries2026].
-  The angular term of $G_{22}$ has a different energy dependence and cannot be
-  sampled on its own. Its contribution to the rate, $(\xi_{31}^2/3)\,G_{22}$, is
-  below $10^{-4}$ of the total for ⁷⁶Ge with $\xi_{31} \approx 0.13$.
 
 ## Usage
 
@@ -116,13 +107,5 @@ _remage_ macro, for example:
     J. Kotila and F. Iachello, Phys. Rev. C 85, 034316 (2012),
     [arXiv:1209.5722](https://arxiv.org/abs/1209.5722).
 
-[^simkovic2018]:
-    F. Šimkovic, R. Dvornický, D. Štefánik and A. Faessler, Phys. Rev. C 97,
-    034315 (2018), [arXiv:1804.04227](https://arxiv.org/abs/1804.04227).
-
 [^doi1985]:
     M. Doi, T. Kotani and E. Takasugi, Prog. Theor. Phys. Suppl. 83, 1 (1985).
-
-[^devries2026]:
-    J. de Vries, E. Mereghetti, S. el Morabit and S. Sandner,
-    [arXiv:2610.28742](https://arxiv.org/abs/2610.28742) (2026), Eq. (34).

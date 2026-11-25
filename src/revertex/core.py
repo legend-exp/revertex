@@ -7,7 +7,7 @@ import awkward as ak
 import lh5
 import numpy as np
 from lgdo.types import Array, Table
-from numpy.typing import ArrayLike
+from numpy.typing import ArrayLike, NDArray
 
 log = logging.getLogger(__name__)
 
@@ -38,6 +38,36 @@ def convert_output_pos(
         out.add_field(field, Array(col, attrs={"units": lunit}))
 
     return out
+
+
+def make_kin_array(directions: NDArray, ekin: NDArray, g4_pid: NDArray) -> ak.Array:
+    """Pack the particles of each event into an array of kinematics.
+
+    The output can be written with :func:`convert_output_kin`. All particles
+    are emitted at time zero.
+
+    Parameters
+    ----------
+    directions
+        unit vectors of the momentum directions, with shape
+        `(n_events, n_particles, 3)`.
+    ekin
+        kinetic energies, with shape `(n_events, n_particles)`.
+    g4_pid
+        PDG codes of the particles, with shape `(n_events, n_particles)`.
+    """
+    out = {
+        "px": directions[..., 0],
+        "py": directions[..., 1],
+        "pz": directions[..., 2],
+        "ekin": ekin,
+        "time": np.zeros_like(ekin),
+        "g4_pid": g4_pid.astype(np.int64),
+    }
+    # variable-length lists, so every event gets its own n_part entry
+    out = {key: ak.from_regular(val, axis=1) for key, val in out.items()}
+
+    return ak.Array(out)
 
 
 def convert_output_kin(
