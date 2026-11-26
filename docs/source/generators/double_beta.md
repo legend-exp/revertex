@@ -2,11 +2,10 @@
 
 This generator samples the two electrons of double-beta decay, for example the
 two-neutrino mode (2νββ) of ⁷⁶Ge. The energies of the two electrons are sampled
-from a 2D spectrum given in a file, and their directions from the angular
-correlation of the decay. The events are written in the
+from a 2D spectrum given in a file, and their directions from an approximation
+of the angular correlation of the decay. The events are written in the
 {ref}`remage kinematics format <remage:manual-input>`, with two electrons per
-decay. The position of the decay is not part of the output and is set in
-_remage_, for example uniformly in the germanium detectors.
+decay.
 
 ## Input spectrum
 
@@ -44,15 +43,18 @@ $$
 
 where $\beta_i$ is the velocity of electron $i$ (in units of $c$) and $m_e$ the
 electron mass. The electrons are therefore preferentially emitted back to back.
-The factor $\beta_1\beta_2$ uses the same leading-order electron wave functions
-in the Coulomb field of the nucleus as the usual Fermi function [^doi1985].
-Exact Dirac wave functions with screening make the correlation stronger: for
-⁷⁶Ge by about 4 % at electron energies of 500 keV, and by up to 15 % at energies
-near 50 keV and 1.5 MeV [^kotila2012].
 
-The generator samples $\cos\theta$ by inverting the cumulative distribution (see
-{func}`.double_beta.sample_cos_theta`), and the azimuth of the second electron
-around the first uniformly.
+:::{warning}
+
+This angular correlation is an approximation. The factor $\beta_1\beta_2$ uses
+the same leading-order electron wave functions in the Coulomb field of the
+nucleus as the usual Fermi function [^doi1985]. Exact Dirac wave functions with
+screening make the correlation stronger: for ⁷⁶Ge by about 4 % at electron
+energies of 500 keV, and by up to 15 % at energies near 50 keV and 1.5 MeV
+[^kotila2012]. For some detectors the correlation may need to be updated to a
+more exact one.
+
+:::
 
 ## Usage
 
@@ -88,19 +90,6 @@ double_beta.save_double_beta_kinematics(
 # or get the decays as an awkward array
 spectrum = utils.read_input_2d_spectrum("76Ge_2ds.txt")
 events = double_beta.generate_double_beta_kinematics(10_000, spectrum=spectrum, seed=1)
-```
-
-### remage
-
-The output only contains the kinematics, so the positions are set in the
-_remage_ macro, for example:
-
-```text
-/RMG/Generator/Select FromFile
-/RMG/Generator/FromFile/FileName 76Ge_2vbb.lh5
-
-/RMG/Generator/Confine Volume
-/RMG/Generator/Confinement/Physical/AddVolume V.*
 ```
 
 [^kotila2012]:
