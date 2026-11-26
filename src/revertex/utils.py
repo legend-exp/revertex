@@ -57,19 +57,28 @@ def read_input_beta_csv(path: str, **kwargs) -> tuple[np.ndarray, np.ndarray]:
 
 
 def read_input_2d_spectrum(path: str, *, eunit: str = "MeV") -> hist.Hist:
-    """Read a 2D spectrum of two particle energies into a histogram.
+    r"""Read a 2D spectrum of two particle energies into a histogram.
 
-    The file is a whitespace-separated text file, optionally gzip compressed
-    (``.gz``), in the format of the double-beta decay spectra of Kotila and
-    Iachello (``*_2ds.txt`` at https://nucleartheory.yale.edu)::
+    The format is that of the double-beta decay spectra of Kotila and Iachello
+    (``*_2ds.txt`` at https://nucleartheory.yale.edu). The file must follow
+    these rules, otherwise a :class:`ValueError` is raised:
 
-        index_1  index_2  energy_1  energy_2  value
+    - Text file, optionally gzip compressed (``.gz``). Lines starting with
+      ``#`` are comments.
+    - Five whitespace-separated columns per line::
 
-    The two indices are not used. The energies of each axis are the values that
-    appear in the file. They form a grid, and each grid point becomes the centre
-    of a histogram bin. The value is the spectrum at that point, in arbitrary
-    units. Grid points missing from the file, for example above the endpoint,
-    are set to zero.
+          index_1  index_2  energy_1  energy_2  value
+
+    - The indices are positive integers :math:`k` and the energies are
+      :math:`k \, \Delta E`, with the same step :math:`\Delta E > 0` for both
+      particles. The grid is therefore uniform and starts at :math:`\Delta E`.
+    - Each pair of indices appears at most once.
+    - The values are finite and not negative, and at least one is positive.
+      They are the spectrum at the grid point, in arbitrary units.
+
+    Grid point :math:`k` becomes the centre of the histogram bin
+    :math:`[(k - 1/2)\,\Delta E, (k + 1/2)\,\Delta E]`, for both axes. Grid
+    points missing from the file, for example above the endpoint, are zero.
 
     Parameters
     ----------
@@ -89,37 +98,47 @@ def read_input_2d_spectrum(path: str, *, eunit: str = "MeV") -> hist.Hist:
         msg = f"{path} must have 5 columns, not {data.shape[1]}"
         raise ValueError(msg)
 
-    e1 = data[:, 2] * factors[eunit]
-    e2 = data[:, 3] * factors[eunit]
-    value = data[:, 4]
+    if not np.all(np.isfinite(data)):
+        msg = f"{path} contains values that are not finite numbers"
+        raise ValueError(msg)
 
+    index = data[:, :2]
+    if np.any(index < 1) or np.any(index != np.round(index)):
+        msg = f"{path}: the indices must be positive integers"
+        raise ValueError(msg)
+    index = index.astype(np.int64)
+
+    # the grid step, from the first point, then check all energies against it.
+    # The tolerance allows for the rounding of the energies in the file.
+    energy = data[:, 2:4] * factors[eunit]
+    step = energy[0, 0] / index[0, 0]
+    if step <= 0 or not np.allclose(energy, index * step, rtol=0, atol=1e-3 * step):
+        msg = (
+            f"{path}: the energies must be index * step, on one uniform grid "
+            "for both particles"
+        )
+        raise ValueError(msg)
+
+    value = data[:, 4]
     if np.any(value < 0):
         msg = f"{path} has negative values, which are not a valid spectrum"
         raise ValueError(msg)
-
-    points_1 = np.unique(e1)
-    points_2 = np.unique(e2)
-
-    histo = hist.Hist(
-        hist.axis.Variable(_bin_edges(points_1)),
-        hist.axis.Variable(_bin_edges(points_2)),
-    )
-    histo.view()[np.searchsorted(points_1, e1), np.searchsorted(points_2, e2)] = value
-
-    return histo
-
-
-def _bin_edges(points: np.ndarray) -> np.ndarray:
-    """Bin edges with the grid `points` at the bin centres, not below zero."""
-    if len(points) < 2:
-        msg = "the spectrum needs at least two energies per axis"
+    if not np.any(value > 0):
+        msg = f"{path} has no positive values, which is not a valid spectrum"
         raise ValueError(msg)
 
-    mid = (points[1:] + points[:-1]) / 2
-    first = max(points[0] - (mid[0] - points[0]), 0)
-    last = points[-1] + (points[-1] - mid[-1])
+    n_bins = index.max()
+    if len(np.unique((index[:, 0] - 1) * n_bins + index[:, 1] - 1)) != len(index):
+        msg = f"{path} lists some pairs of indices more than once"
+        raise ValueError(msg)
 
-    return np.concatenate(([first], mid, [last]))
+    histo = hist.Hist(
+        hist.axis.Regular(n_bins, 0.5 * step, (n_bins + 0.5) * step),
+        hist.axis.Regular(n_bins, 0.5 * step, (n_bins + 0.5) * step),
+    )
+    histo.view()[index[:, 0] - 1, index[:, 1] - 1] = value
+
+    return histo
 
 
 def find_mother_physical_volumes(
