@@ -56,25 +56,79 @@ def read_input_beta_csv(path: str, **kwargs) -> tuple[np.ndarray, np.ndarray]:
     return np.genfromtxt(path, **kwargs).T[0], np.genfromtxt(path, **kwargs).T[1]
 
 
-def read_input_2d_spectrum(path: str, *, eunit: str = "MeV") -> hist.Hist:
-    r"""Read a 2D spectrum of two particle energies into a histogram.
+def validate_2d_spectrum(data: np.ndarray) -> None:
+    r"""Check that a table is a valid 2D spectrum of two particle energies.
 
     The format is that of the double-beta decay spectra of Kotila and Iachello
-    (``*_2ds.txt`` at https://nucleartheory.yale.edu). The file must follow
-    these rules, otherwise a :class:`ValueError` is raised:
+    (``*_2ds.txt`` at https://nucleartheory.yale.edu), one row per grid point::
 
-    - Text file, optionally gzip compressed (``.gz``). Lines starting with
-      ``#`` are comments.
-    - Five whitespace-separated columns per line::
+        index_1  index_2  energy_1  energy_2  value
 
-          index_1  index_2  energy_1  energy_2  value
+    The rules are:
 
+    - There are five columns.
+    - All numbers are finite.
     - The indices are positive integers :math:`k` and the energies are
       :math:`k \, \Delta E`, with the same step :math:`\Delta E > 0` for both
       particles. The grid is therefore uniform and starts at :math:`\Delta E`.
+    - The values are not negative, and at least one is positive. They are the
+      spectrum at the grid point, in arbitrary units.
     - Each pair of indices appears at most once.
-    - The values are finite and not negative, and at least one is positive.
-      They are the spectrum at the grid point, in arbitrary units.
+
+    Parameters
+    ----------
+    data
+        the table, with one row per grid point.
+
+    Raises
+    ------
+    ValueError
+        if a rule is broken, with a message that names the rule.
+    """
+    if data.ndim != 2 or data.shape[1] != 5:
+        msg = f"the spectrum must have 5 columns, not {data.shape[-1]}"
+        raise ValueError(msg)
+
+    if not np.all(np.isfinite(data)):
+        msg = "the spectrum contains numbers that are not finite"
+        raise ValueError(msg)
+
+    index = data[:, :2]
+    if np.any(index < 1) or np.any(index != np.round(index)):
+        msg = "the indices must be positive integers"
+        raise ValueError(msg)
+
+    # the grid step, from the first point, then check all energies against it.
+    # The tolerance allows for the rounding of the energies in the file.
+    energy = data[:, 2:4]
+    step = energy[0, 0] / index[0, 0]
+    if step <= 0 or not np.allclose(energy, index * step, rtol=0, atol=1e-3 * step):
+        msg = (
+            "the energies must be index * step, on one uniform grid for both particles"
+        )
+        raise ValueError(msg)
+
+    value = data[:, 4]
+    if np.any(value < 0):
+        msg = "the spectrum has negative values"
+        raise ValueError(msg)
+    if not np.any(value > 0):
+        msg = "the spectrum has no positive values"
+        raise ValueError(msg)
+
+    index = index.astype(np.int64)
+    n_max = index.max()
+    if len(np.unique((index[:, 0] - 1) * n_max + index[:, 1] - 1)) != len(index):
+        msg = "some pairs of indices appear more than once"
+        raise ValueError(msg)
+
+
+def read_input_2d_spectrum(path: str, *, eunit: str = "MeV") -> hist.Hist:
+    r"""Read a 2D spectrum of two particle energies into a histogram.
+
+    The file is a text file, optionally gzip compressed (``.gz``), in the
+    format checked by :func:`validate_2d_spectrum`. Lines starting with ``#``
+    are comments.
 
     Grid point :math:`k` becomes the centre of the histogram bin
     :math:`[(k - 1/2)\,\Delta E, (k + 1/2)\,\Delta E]`, for both axes. Grid
@@ -94,49 +148,21 @@ def read_input_2d_spectrum(path: str, *, eunit: str = "MeV") -> hist.Hist:
         raise ValueError(msg)
 
     data = np.loadtxt(path, ndmin=2)
-    if data.shape[1] != 5:
-        msg = f"{path} must have 5 columns, not {data.shape[1]}"
-        raise ValueError(msg)
+    try:
+        validate_2d_spectrum(data)
+    except ValueError as e:
+        msg = f"{path}: {e}"
+        raise ValueError(msg) from e
 
-    if not np.all(np.isfinite(data)):
-        msg = f"{path} contains values that are not finite numbers"
-        raise ValueError(msg)
-
-    index = data[:, :2]
-    if np.any(index < 1) or np.any(index != np.round(index)):
-        msg = f"{path}: the indices must be positive integers"
-        raise ValueError(msg)
-    index = index.astype(np.int64)
-
-    # the grid step, from the first point, then check all energies against it.
-    # The tolerance allows for the rounding of the energies in the file.
-    energy = data[:, 2:4] * factors[eunit]
-    step = energy[0, 0] / index[0, 0]
-    if step <= 0 or not np.allclose(energy, index * step, rtol=0, atol=1e-3 * step):
-        msg = (
-            f"{path}: the energies must be index * step, on one uniform grid "
-            "for both particles"
-        )
-        raise ValueError(msg)
-
-    value = data[:, 4]
-    if np.any(value < 0):
-        msg = f"{path} has negative values, which are not a valid spectrum"
-        raise ValueError(msg)
-    if not np.any(value > 0):
-        msg = f"{path} has no positive values, which is not a valid spectrum"
-        raise ValueError(msg)
-
+    index = data[:, :2].astype(np.int64)
+    step = data[0, 2] / data[0, 0] * factors[eunit]
     n_bins = index.max()
-    if len(np.unique((index[:, 0] - 1) * n_bins + index[:, 1] - 1)) != len(index):
-        msg = f"{path} lists some pairs of indices more than once"
-        raise ValueError(msg)
 
     histo = hist.Hist(
         hist.axis.Regular(n_bins, 0.5 * step, (n_bins + 0.5) * step),
         hist.axis.Regular(n_bins, 0.5 * step, (n_bins + 0.5) * step),
     )
-    histo.view()[index[:, 0] - 1, index[:, 1] - 1] = value
+    histo.view()[index[:, 0] - 1, index[:, 1] - 1] = data[:, 4]
 
     return histo
 

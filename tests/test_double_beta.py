@@ -91,8 +91,10 @@ def test_read_input_2d_spectrum_comments_and_single_point(tmp_path):
 def test_read_input_2d_spectrum_invalid(tmp_path, text, match):
     path = tmp_path / "bad_2ds.txt"
     path.write_text(text)
-    with pytest.raises(ValueError, match=match):
+    with pytest.raises(ValueError, match=match) as err:
         utils.read_input_2d_spectrum(str(path))
+    # the message names the file
+    assert str(path) in str(err.value)
 
 
 def test_read_input_2d_spectrum_invalid_unit(tmp_path):
@@ -100,6 +102,19 @@ def test_read_input_2d_spectrum_invalid_unit(tmp_path):
     path.write_text("1 1 0.1 0.1 1\n")
     with pytest.raises(ValueError, match="eunits"):
         utils.read_input_2d_spectrum(str(path), eunit="GeV")
+
+
+def test_validate_2d_spectrum():
+    # valid: 1 keV grid in MeV, with a missing point
+    utils.validate_2d_spectrum(
+        np.array([[1, 1, 0.001, 0.001, 0.0], [2, 1, 0.002, 0.001, 1.0]])
+    )
+
+    with pytest.raises(ValueError, match="5 columns"):
+        utils.validate_2d_spectrum(np.array([1, 1, 0.001, 0.001, 1.0]))
+
+    with pytest.raises(ValueError, match="negative"):
+        utils.validate_2d_spectrum(np.array([[1, 1, 0.001, 0.001, -1.0]]))
 
 
 def test_electron_beta():

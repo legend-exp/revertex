@@ -14,7 +14,8 @@ $T_1$ and $T_2$ of the two electrons, tabulated on a grid. The format is that of
 the `*_2ds.txt` files of Kotila and Iachello [^kotila2012], which can be
 downloaded for many isotopes from
 [nucleartheory.yale.edu](https://nucleartheory.yale.edu/double-beta-decay-phase-space-factors).
-The file must follow these rules; the generator stops with an error otherwise.
+The file must follow these rules; the generator stops with an error otherwise
+(see {func}`.utils.validate_2d_spectrum`).
 
 1. It is a text file, optionally gzip compressed (`.txt.gz`). Lines starting
    with `#` are comments.
