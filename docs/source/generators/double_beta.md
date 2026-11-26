@@ -7,25 +7,39 @@ of the angular correlation of the decay. The events are written in the
 {ref}`remage kinematics format <remage:manual-input>`, with two electrons per
 decay.
 
-## Input spectrum
+## Format of the input spectrum
 
-The spectrum is a text file with one line per point of a grid of the two
-electron kinetic energies $(T_1, T_2)$:
+The input is the 2D spectrum $d^2\Gamma/dT_1\,dT_2$ of the kinetic energies
+$T_1$ and $T_2$ of the two electrons, tabulated on a grid. The format is that of
+the `*_2ds.txt` files of Kotila and Iachello [^kotila2012], which can be
+downloaded for many isotopes from
+[nucleartheory.yale.edu](https://nucleartheory.yale.edu/double-beta-decay-phase-space-factors).
+The file must follow these rules; the generator stops with an error otherwise.
+
+1. It is a text file, optionally gzip compressed (`.txt.gz`). Lines starting
+   with `#` are comments.
+2. Each line has five columns, separated by spaces:
+   `index_1  index_2  T_1  T_2  value`.
+3. The indices are positive integers $k_1, k_2$, and the energies are $T_i =
+   k_i\,\Delta T$. The step $\Delta T$ is the same for both electrons, so the
+   grid is uniform and starts at $\Delta T$.
+4. The energies are in MeV, unless another unit is given with `--eunit` (`eV`,
+   `keV` or `MeV`).
+5. `value` is the spectrum at that grid point, in arbitrary units. It must be a
+   finite number and not negative, and at least one value must be positive.
+6. Each pair $(k_1, k_2)$ appears at most once. Grid points that are not in the
+   file, such as those with $T_1 + T_2$ above the Q-value, are zero.
+
+For example, the first lines of a spectrum with $\Delta T = 1$ keV:
 
 ```text
-index_1  index_2  T_1  T_2  value
+    1     1  0.0010  0.0010   0.0000E+00
+    1     2  0.0010  0.0020   0.4534E-19
+    1     3  0.0010  0.0030   0.4726E-19
 ```
 
-This is the format of the `*_2ds.txt` files of Kotila and Iachello
-[^kotila2012], which can be downloaded for many isotopes from
-[nucleartheory.yale.edu](https://nucleartheory.yale.edu/double-beta-decay-phase-space-factors).
-The indices are not used. The energies are in MeV by default (option `--eunit`).
-The value is the spectrum $d^2\Gamma/dT_1 dT_2$ at that point, in arbitrary
-units; it must not be negative. Points missing from the file, such as those with
-$T_1 + T_2$ above the Q-value, are zero. The file can be gzip compressed
-(`.txt.gz`).
-
-Each grid point is the centre of a histogram bin. The generator draws a bin with
+Grid point $k$ is the centre of the energy bin $[(k - \tfrac{1}{2})\,\Delta T,\
+(k + \tfrac{1}{2})\,\Delta T]$. The generator draws a bin $(k_1, k_2)$ with
 probability proportional to its value, then $T_1$ and $T_2$ uniformly within the
 bin.
 

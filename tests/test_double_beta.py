@@ -61,24 +61,45 @@ def test_read_input_2d_spectrum(tmp_path, name):
     assert np.allclose(histo_kev.axes[0].centers, energies)
 
 
-def test_read_input_2d_spectrum_invalid(tmp_path):
-    path = tmp_path / "bad_columns.txt"
-    path.write_text("1 1 0.1 0.1\n1 2 0.1 0.2\n")
-    with pytest.raises(ValueError, match="5 columns"):
+def test_read_input_2d_spectrum_comments_and_single_point(tmp_path):
+    path = tmp_path / "single_2ds.txt"
+    path.write_text("# a comment\n    3     2  0.0030  0.0020   1.0E+00\n")
+    histo = utils.read_input_2d_spectrum(str(path))
+
+    # grid of three 1 keV bins per axis, starting at 0.5 keV
+    assert np.allclose(histo.axes[0].edges, [0.5, 1.5, 2.5, 3.5])
+    assert histo.values()[2, 1] == 1
+    assert histo.values().sum() == 1
+
+
+@pytest.mark.parametrize(
+    ("text", "match"),
+    [
+        ("1 1 0.1 0.1\n", "5 columns"),
+        ("1 1 0.1 0.1 nan\n", "not finite"),
+        ("0 1 0.0 0.1 1\n", "positive integers"),
+        ("1.5 1 0.15 0.1 1\n", "positive integers"),
+        # not a uniform grid
+        ("1 1 0.1 0.1 1\n2 1 0.25 0.1 1\n", "index \\* step"),
+        # different steps for the two particles
+        ("1 1 0.1 0.2 1\n", "index \\* step"),
+        ("1 1 0.1 0.1 1\n2 1 0.2 0.1 -1\n", "negative"),
+        ("1 1 0.1 0.1 0\n2 1 0.2 0.1 0\n", "no positive"),
+        ("1 1 0.1 0.1 1\n1 1 0.1 0.1 2\n", "more than once"),
+    ],
+)
+def test_read_input_2d_spectrum_invalid(tmp_path, text, match):
+    path = tmp_path / "bad_2ds.txt"
+    path.write_text(text)
+    with pytest.raises(ValueError, match=match):
         utils.read_input_2d_spectrum(str(path))
 
-    path = tmp_path / "negative.txt"
-    _write_spectrum(path, np.array([0.1, 0.2, 0.3]), lambda _e1, _e2: -1, 0.45)
-    with pytest.raises(ValueError, match="negative"):
-        utils.read_input_2d_spectrum(str(path))
 
+def test_read_input_2d_spectrum_invalid_unit(tmp_path):
+    path = tmp_path / "spec_2ds.txt"
+    path.write_text("1 1 0.1 0.1 1\n")
     with pytest.raises(ValueError, match="eunits"):
         utils.read_input_2d_spectrum(str(path), eunit="GeV")
-
-    path = tmp_path / "one_point.txt"
-    path.write_text("1 1 0.1 0.1 1.0\n")
-    with pytest.raises(ValueError, match="two energies"):
-        utils.read_input_2d_spectrum(str(path))
 
 
 def test_electron_beta():
